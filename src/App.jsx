@@ -127,30 +127,75 @@ function Btn({ children, onClick, variant = "primary", style = {}, small = false
 }
 
 // ── Prayer Card ───────────────────────────────────────────────────────────────
-function PrayerCard({ prayer, onAnswer, onDelete, mine = true, onAddToList, myPrayingIds, onTogglePraying }) {
+function PrayerCard({ prayer, onAnswer, onDelete, mine = true, onAddToList, myPrayingIds, onTogglePraying, activePrayMode = false, covered = false, onToggleCovered }) {
   const [expanded, setExpanded] = useState(false);
   const days = daysBetween(prayer.date, today());
   const isPraying = myPrayingIds?.includes(prayer.id);
+  const isAnswered = prayer.status === "answered";
+
+  const handleCover = (e) => {
+    e.stopPropagation();
+    onToggleCovered && onToggleCovered(prayer.id);
+  };
 
   return (
-    <Card style={{ borderLeft: `3px solid ${prayer.status === "answered" ? T.sage : T.gold}` }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div style={{ flex: 1, cursor: "pointer" }} onClick={() => setExpanded(!expanded)}>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>
-            <CategoryPill cat={prayer.category} />
-            {prayer.status === "answered" && <Badge label="✓ Answered" color={T.sage} />}
-            {mine && !prayer.isPublic && <Badge label="🔒 Private" color={T.inkLight} />}
+    <Card style={{
+      padding: "11px 14px", marginBottom: 8,
+      borderLeft: `3px solid ${covered ? T.sageLight : isAnswered ? T.sage : T.gold}`,
+      opacity: covered ? 0.55 : 1,
+      transition: "opacity 0.3s, border-color 0.3s",
+    }}>
+      {/* Collapsed row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+
+        {/* Active pray touch target */}
+        {activePrayMode && mine && !isAnswered ? (
+          <button onClick={handleCover} style={{
+            width: 26, height: 26, borderRadius: "50%", border: `1.5px solid ${covered ? T.sage : T.sageLight}`,
+            background: covered ? T.sage : "transparent", cursor: "pointer", flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13,
+            transition: "all 0.2s", padding: 0,
+          }}>
+            {covered ? <span style={{ color: T.white, fontSize: 11 }}>🙏</span> : <span style={{ color: T.sageLight, fontSize: 10 }}>🙏</span>}
+          </button>
+        ) : (
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: covered ? T.sageLight : isAnswered ? T.sage : T.gold, flexShrink: 0, marginLeft: 1 }} />
+        )}
+
+        <div style={{ flex: 1, cursor: "pointer", overflow: "hidden" }} onClick={() => setExpanded(!expanded)}>
+          <div style={{
+            fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, fontSize: 16,
+            color: covered ? T.inkLight : T.ink, lineHeight: 1.3,
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+            textDecoration: covered ? "line-through" : "none",
+            textDecorationColor: T.sageLight,
+            transition: "color 0.3s",
+          }}>
+            {prayer.title}
           </div>
-          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, fontSize: 17, color: T.ink, lineHeight: 1.3, marginBottom: 4 }}>{prayer.title}</div>
-          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{fmt(prayer.date)} · {days === 0 ? "Today" : `${days}d ago`}</div>
         </div>
-        <div style={{ color: T.sageLight, fontSize: 18, paddingLeft: 8, cursor: "pointer" }} onClick={() => setExpanded(!expanded)}>{expanded ? "▲" : "▾"}</div>
+
+        {/* Right-side hints */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, cursor: "pointer" }} onClick={() => setExpanded(!expanded)}>
+          {isAnswered && <span style={{ fontSize: 12, color: T.sage }}>✓</span>}
+          {mine && !prayer.isPublic && <span style={{ fontSize: 11 }}>🔒</span>}
+          <span style={{ fontSize: 10, color: T.inkLight, fontFamily: "'DM Sans', sans-serif" }}>{prayer.category.split(" ")[0]}</span>
+          <span style={{ color: T.parchment, fontSize: 14 }}>{expanded ? "▲" : "▾"}</span>
+        </div>
       </div>
 
       {expanded && (
         <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.parchment}` }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+            <CategoryPill cat={prayer.category} />
+            {isAnswered && <Badge label="✓ Answered" color={T.sage} />}
+            {mine && !prayer.isPublic && <Badge label="🔒 Private" color={T.inkLight} />}
+            <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, alignSelf: "center" }}>
+              {fmt(prayer.date)} · {days === 0 ? "Today" : `${days}d`}
+            </span>
+          </div>
           {prayer.note && <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, marginBottom: 12, lineHeight: 1.6 }}>{prayer.note}</p>}
-          {prayer.status === "answered" && prayer.answeredNote && (
+          {isAnswered && prayer.answeredNote && (
             <div style={{ background: T.answeredBg, borderRadius: 10, padding: "10px 14px", marginBottom: 12 }}>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.sageDark, fontWeight: 500, marginBottom: 4 }}>🙌 What happened</div>
               <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16, color: T.ink, lineHeight: 1.5 }}>{prayer.answeredNote}</div>
@@ -160,7 +205,7 @@ function PrayerCard({ prayer, onAnswer, onDelete, mine = true, onAddToList, myPr
           {!mine && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <Btn small variant={isPraying ? "secondary" : "ghost"} onClick={() => onTogglePraying(prayer.id)}>
-                🙏 {isPraying ? "Praying" : "I'm Praying"} {prayer.praying > 0 && `(${prayer.praying + (isPraying ? 0 : 0)})`}
+                🙏 {isPraying ? "Praying" : "I'm Praying"} {prayer.praying > 0 && `(${prayer.praying})`}
               </Btn>
               <Btn small variant="gold" onClick={() => onAddToList(prayer)}>+ My List</Btn>
             </div>
@@ -248,14 +293,39 @@ function AnswerModal({ prayer, onClose, onConfirm }) {
 }
 
 // ── My Prayers Tab ────────────────────────────────────────────────────────────
+const SORT_OPTIONS = [
+  { id: "newest", label: "Newest" },
+  { id: "oldest", label: "Oldest" },
+  { id: "longest", label: "Longest waiting" },
+  { id: "az", label: "A – Z" },
+];
+const ALL_CATS = Object.keys(CAT_COLORS);
+
 function MyPrayers({ prayers, setPrayers }) {
   const [showAdd, setShowAdd] = useState(false);
   const [answerTarget, setAnswerTarget] = useState(null);
-  const [filter, setFilter] = useState("active");
+  const [statusFilter, setStatusFilter] = useState("active");
+  const [catFilter, setCatFilter] = useState("All");
+  const [sort, setSort] = useState("newest");
+  const [showFilters, setShowFilters] = useState(false);
+  const [activePrayMode, setActivePrayMode] = useState(false);
+  const [coveredIds, setCoveredIds] = useState([]);
 
   const active = prayers.filter(p => p.status === "active");
   const answered = prayers.filter(p => p.status === "answered");
-  const shown = filter === "active" ? active : answered;
+
+  // derive displayed list
+  let shown = statusFilter === "active" ? active : answered;
+  if (catFilter !== "All") shown = shown.filter(p => p.category === catFilter);
+  shown = [...shown].sort((a, b) => {
+    if (sort === "newest") return new Date(b.date) - new Date(a.date);
+    if (sort === "oldest") return new Date(a.date) - new Date(b.date);
+    if (sort === "longest") return new Date(a.date) - new Date(b.date);
+    if (sort === "az") return a.title.localeCompare(b.title);
+    return 0;
+  });
+
+  const coveredCount = coveredIds.filter(id => shown.find(p => p.id === id)).length;
 
   const addPrayer = ({ title, note, category, isPublic }) => {
     const newP = { id: Date.now(), title, note, category, isPublic, status: "active", date: today(), answeredNote: null, praying: 0 };
@@ -270,9 +340,19 @@ function MyPrayers({ prayers, setPrayers }) {
     setAnswerTarget(null);
   };
 
+  const toggleCovered = (id) => {
+    setCoveredIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const endSession = () => {
+    setActivePrayMode(false);
+    setCoveredIds([]);
+  };
+
   return (
     <div style={tabContent}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div>
           <div style={pageTitle}>My Prayers</div>
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>{active.length} active · {answered.length} answered</div>
@@ -280,22 +360,77 @@ function MyPrayers({ prayers, setPrayers }) {
         <Btn small onClick={() => setShowAdd(true)}>+ Add</Btn>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+      {/* Active Pray session banner */}
+      {activePrayMode ? (
+        <div style={{ background: T.sageLight, borderRadius: 14, padding: "12px 16px", marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 500, color: T.sageDark }}>🙏 Praying through your list</div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.sageDark, opacity: 0.8 }}>{coveredCount} of {shown.filter(p => p.status === "active").length} covered</div>
+          </div>
+          <Btn small variant="ghost" style={{ color: T.sageDark, borderColor: T.sage }} onClick={endSession}>Done</Btn>
+        </div>
+      ) : (
+        <button onClick={() => { setActivePrayMode(true); setStatusFilter("active"); }} style={{ width: "100%", background: T.goldLight, border: `1.5px dashed ${T.gold}`, borderRadius: 14, padding: "11px 16px", marginBottom: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.gold, fontWeight: 500 }}>
+          <span style={{ fontSize: 18 }}>🙏</span> Start Praying Through My List
+        </button>
+      )}
+
+      {/* Status filter + filter toggle */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center" }}>
         {["active", "answered"].map(f => (
-          <button key={f} onClick={() => setFilter(f)} style={{ border: "none", borderRadius: 20, padding: "6px 16px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", background: filter === f ? T.sageDark : T.parchment, color: filter === f ? T.white : T.inkLight, transition: "all 0.15s" }}>
+          <button key={f} onClick={() => setStatusFilter(f)} style={{ border: "none", borderRadius: 20, padding: "6px 14px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", background: statusFilter === f ? T.sageDark : T.parchment, color: statusFilter === f ? T.white : T.inkLight, transition: "all 0.15s" }}>
             {f === "active" ? `Active (${active.length})` : `Answered (${answered.length})`}
           </button>
         ))}
+        <button onClick={() => setShowFilters(!showFilters)} style={{ marginLeft: "auto", border: `1px solid ${showFilters ? T.sageDark : T.parchment}`, borderRadius: 20, padding: "6px 12px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", background: showFilters ? T.sageLight : "transparent", color: showFilters ? T.sageDark : T.inkLight, transition: "all 0.15s" }}>
+          ⊞ Filter
+        </button>
       </div>
+
+      {/* Expanded filter panel */}
+      {showFilters && (
+        <div style={{ background: T.white, borderRadius: 14, padding: "14px 16px", marginBottom: 12, boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, fontWeight: 500, letterSpacing: 0.7, textTransform: "uppercase", marginBottom: 8 }}>Category</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+            {["All", ...ALL_CATS].map(c => (
+              <button key={c} onClick={() => setCatFilter(c)} style={{ border: `1.5px solid ${catFilter === c ? T.sageDark : T.parchment}`, background: catFilter === c ? T.sageLight : "transparent", borderRadius: 20, padding: "4px 12px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", color: catFilter === c ? T.sageDark : T.inkLight, transition: "all 0.15s" }}>
+                {c}
+              </button>
+            ))}
+          </div>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, fontWeight: 500, letterSpacing: 0.7, textTransform: "uppercase", marginBottom: 8 }}>Sort by</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {SORT_OPTIONS.map(s => (
+              <button key={s.id} onClick={() => setSort(s.id)} style={{ border: `1.5px solid ${sort === s.id ? T.sageDark : T.parchment}`, background: sort === s.id ? T.sageLight : "transparent", borderRadius: 20, padding: "4px 12px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", color: sort === s.id ? T.sageDark : T.inkLight, transition: "all 0.15s" }}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Results count when filtered */}
+      {(catFilter !== "All") && (
+        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, marginBottom: 8 }}>
+          {shown.length} prayer{shown.length !== 1 ? "s" : ""} {catFilter !== "All" ? `in ${catFilter}` : ""}
+          {catFilter !== "All" && <button onClick={() => setCatFilter("All")} style={{ marginLeft: 8, border: "none", background: "none", color: T.dustyRose, cursor: "pointer", fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}>✕ Clear</button>}
+        </div>
+      )}
 
       {shown.length === 0 && (
         <div style={{ textAlign: "center", padding: "40px 20px", color: T.inkLight, fontFamily: "'DM Sans', sans-serif", fontSize: 14 }}>
-          {filter === "active" ? "No active prayers yet. Add one above." : "No answered prayers yet. Keep praying!"}
+          {statusFilter === "active" ? "No active prayers yet. Add one above." : "No answered prayers yet. Keep praying!"}
         </div>
       )}
 
       {shown.map(p => (
-        <PrayerCard key={p.id} prayer={p} mine onAnswer={setAnswerTarget} onDelete={deletePrayer} />
+        <PrayerCard
+          key={p.id} prayer={p} mine
+          onAnswer={setAnswerTarget} onDelete={deletePrayer}
+          activePrayMode={activePrayMode}
+          covered={coveredIds.includes(p.id)}
+          onToggleCovered={toggleCovered}
+        />
       ))}
 
       {showAdd && <AddPrayerModal onClose={() => setShowAdd(false)} onAdd={addPrayer} />}
