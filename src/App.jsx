@@ -63,7 +63,7 @@ const SORT_OPTIONS = [
   { id: "az", label: "A – Z" },
 ];
 
-const tabContent = { padding: "24px 16px 100px", maxWidth: 480, margin: "0 auto" };
+const tabContent = { padding: "18px 16px 100px", maxWidth: 480, margin: "0 auto" };
 const pageTitle = { fontFamily: "'Cormorant Garamond', serif", fontSize: 30, fontWeight: 600, color: T.ink, lineHeight: 1.1, marginBottom: 2 };
 const inputStyle = { width: "100%", border: `1.5px solid ${T.parchment}`, borderRadius: 12, padding: "11px 14px", fontSize: 14, fontFamily: "'DM Sans', sans-serif", color: T.ink, background: T.white, boxSizing: "border-box", outline: "none", marginBottom: 12 };
 const labelStyle = { display: "block", fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, fontWeight: 500, marginBottom: 6, letterSpacing: 0.3 };
@@ -669,7 +669,8 @@ function SignIn({ onSignIn }) {
   return (
     <div style={{ minHeight: "100vh", background: T.cream, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32 }}>
       <div style={{ fontSize: 52, marginBottom: 16 }}>🕊️</div>
-      <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 40, fontWeight: 300, color: T.ink, letterSpacing: -1, marginBottom: 8 }}>LIFT</div>
+      <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 44, fontWeight: 600, color: T.ink, letterSpacing: 4, marginBottom: 4 }}>LIFT</div>
+      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.sageDark, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 500, marginBottom: 24 }}>Log it for Transformation</div>
       <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: T.inkLight, textAlign: "center", maxWidth: 270, lineHeight: 1.6, marginBottom: 32 }}>A quiet place to bring your prayers, hold others up, and remember how God moves.</div>
       <input style={{ ...inputStyle, maxWidth: 280, textAlign: "center", marginBottom: 12 }} placeholder="What's your first name?" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && name.trim()) onSignIn(name.trim()); }} />
       <button onClick={() => { if (name.trim()) onSignIn(name.trim()); }} style={{ background: name.trim() ? T.sageDark : T.sageLight, color: T.white, border: "none", borderRadius: 14, padding: "14px 40px", cursor: name.trim() ? "pointer" : "default", fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 500, opacity: name.trim() ? 1 : 0.6 }}>Enter</button>
@@ -715,6 +716,9 @@ export default function App() {
       <FontLink />
       <ToastProvider>
         <div style={{ minHeight: "100vh", background: T.cream }}>
+          <div style={{ position: "sticky", top: 0, zIndex: 90, background: T.cream, textAlign: "center", padding: "14px 0 10px", borderBottom: `1px solid ${T.parchment}` }}>
+            <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 600, color: T.sageDark, letterSpacing: 3 }}>LIFT</span>
+          </div>
           {tab === "prayers" && <MyPrayers prayers={prayers} setPrayers={setPrayers} friends={friends} firstName={firstName} defaultPublic={defaultPublic} />}
           {tab === "feed" && <Feed friends={friends} myPrayers={prayers} setMyPrayers={setPrayers} />}
           {tab === "friends" && <Friends friends={friends} />}
