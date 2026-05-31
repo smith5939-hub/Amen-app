@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, createContext, useContext } from "react";
 
 const FontLink = () => {
   useEffect(() => {
@@ -25,26 +25,30 @@ const CAT_COLORS = {
   "Spiritual Growth": { bg: "#F5EDD8", text: "#8B6A2A" },
   Finances: { bg: "#E8F0F0", text: "#2A6B6B" },
 };
+const catColor = (cat) => CAT_COLORS[cat] || { bg: T.mist, text: T.inkLight };
+// primary category drives the card accent color
+const primaryCatColor = (cats) => catColor(Array.isArray(cats) ? cats[0] : cats).text;
 
+// NOTE: categories are now arrays. fromFriend/ownerName track prayers held for others.
 const SEED_PRAYERS = [
-  { id: 1, title: "Mom's surgery recovery", category: "Health", note: "She goes in Tuesday. Praying for peace and a smooth procedure.", isPublic: true, status: "active", date: "2025-05-01", answeredNote: null, praying: 3 },
-  { id: 2, title: "Job interview at Northlight", category: "Work / Career", note: "Final round on Friday. Been waiting for this one.", isPublic: true, status: "answered", date: "2025-04-18", answeredNote: "Got the offer! Starting June 3rd. God is so faithful.", praying: 7 },
-  { id: 3, title: "Peace in our marriage", category: "Relationships", note: "We've been going through a rough patch. Asking for patience and grace for us both.", isPublic: false, status: "active", date: "2025-05-10", answeredNote: null, praying: 0 },
-  { id: 4, title: "Financial breakthrough", category: "Finances", note: "Rent increase coming. Trusting God to provide.", isPublic: true, status: "active", date: "2025-05-15", answeredNote: null, praying: 2 },
-  { id: 5, title: "Grow closer to God", category: "Spiritual Growth", note: "Start the year with intentional daily prayer.", isPublic: false, status: "active", date: "2025-01-01", answeredNote: null, praying: 0 },
+  { id: 1, title: "Mom's surgery recovery", categories: ["Health"], note: "She goes in Tuesday. Praying for peace and a smooth procedure.", isPublic: true, status: "active", date: "2025-05-01", answeredNote: null, praying: 3, fromFriend: false, ownerName: null },
+  { id: 2, title: "Job interview at Northlight", categories: ["Work / Career"], note: "Final round on Friday. Been waiting for this one.", isPublic: true, status: "answered", date: "2025-04-18", answeredNote: "Got the offer! Starting June 3rd. God is so faithful.", praying: 7, fromFriend: false, ownerName: null },
+  { id: 3, title: "Peace in our marriage", categories: ["Relationships", "Family"], note: "We've been going through a rough patch. Asking for patience and grace for us both.", isPublic: false, status: "active", date: "2025-05-10", answeredNote: null, praying: 0, fromFriend: false, ownerName: null },
+  { id: 4, title: "Financial breakthrough", categories: ["Finances"], note: "Rent increase coming. Trusting God to provide.", isPublic: true, status: "active", date: "2025-05-15", answeredNote: null, praying: 2, fromFriend: false, ownerName: null },
+  { id: 5, title: "Grow closer to God", categories: ["Spiritual Growth"], note: "Start the year with intentional daily prayer.", isPublic: false, status: "active", date: "2025-01-01", answeredNote: null, praying: 0, fromFriend: false, ownerName: null },
 ];
 
 const SEED_FRIENDS = [
   { id: 1, name: "Sarah M.", avatar: "SM", prayers: [
-    { id: 101, title: "My brother's addiction", category: "Family", note: "Been praying for James for 2 years.", isPublic: true, status: "active", date: "2025-03-01", praying: 12 },
-    { id: 102, title: "New apartment", category: "Finances", note: "Lease is up end of June.", isPublic: true, status: "answered", date: "2025-04-20", answeredNote: "Found the perfect place under budget!", praying: 8 },
+    { id: 101, title: "My brother's addiction", categories: ["Family"], note: "Been praying for James for 2 years.", isPublic: true, status: "active", date: "2025-03-01", praying: 12 },
+    { id: 102, title: "New apartment", categories: ["Finances"], note: "Lease is up end of June.", isPublic: true, status: "answered", date: "2025-04-20", answeredNote: "Found the perfect place under budget!", praying: 8 },
   ]},
   { id: 2, name: "David K.", avatar: "DK", prayers: [
-    { id: 201, title: "Seminary acceptance", category: "Spiritual Growth", note: "Applied to three programs. Surrendering the outcome.", isPublic: true, status: "active", date: "2025-05-05", praying: 5 },
+    { id: 201, title: "Seminary acceptance", categories: ["Spiritual Growth"], note: "Applied to three programs. Surrendering the outcome.", isPublic: true, status: "active", date: "2025-05-05", praying: 5 },
   ]},
   { id: 3, name: "Priya R.", avatar: "PR", prayers: [
-    { id: 301, title: "Dad's heart health", category: "Health", note: "Procedure scheduled for next month.", isPublic: true, status: "active", date: "2025-05-18", praying: 9 },
-    { id: 302, title: "Business launch", category: "Work / Career", note: "Launching the bakery in July.", isPublic: true, status: "active", date: "2025-04-30", praying: 15 },
+    { id: 301, title: "Dad's heart health", categories: ["Health"], note: "Procedure scheduled for next month.", isPublic: true, status: "active", date: "2025-05-18", praying: 9 },
+    { id: 302, title: "Business launch", categories: ["Work / Career"], note: "Launching the bakery in July.", isPublic: true, status: "active", date: "2025-04-30", praying: 15 },
   ]},
 ];
 
@@ -64,8 +68,26 @@ const pageTitle = { fontFamily: "'Cormorant Garamond', serif", fontSize: 30, fon
 const inputStyle = { width: "100%", border: `1.5px solid ${T.parchment}`, borderRadius: 12, padding: "11px 14px", fontSize: 14, fontFamily: "'DM Sans', sans-serif", color: T.ink, background: T.white, boxSizing: "border-box", outline: "none", marginBottom: 12 };
 const labelStyle = { display: "block", fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, fontWeight: 500, marginBottom: 6, letterSpacing: 0.3 };
 
+// ── Toast (confirmation messages) ─────────────────────────────────────────────
+const ToastCtx = createContext(() => {});
+function ToastProvider({ children }) {
+  const [toast, setToast] = useState(null);
+  const show = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2200); };
+  return (
+    <ToastCtx.Provider value={show}>
+      {children}
+      {toast && (
+        <div style={{ position: "fixed", bottom: 90, left: "50%", transform: "translateX(-50%)", background: T.sageDark, color: T.white, padding: "11px 20px", borderRadius: 24, fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 500, boxShadow: "0 4px 16px rgba(0,0,0,0.2)", zIndex: 2000, display: "flex", alignItems: "center", gap: 8, maxWidth: "85%" }}>
+          <span>✓</span> {toast}
+        </div>
+      )}
+    </ToastCtx.Provider>
+  );
+}
+const useToast = () => useContext(ToastCtx);
+
 function CategoryPill({ cat }) {
-  const c = CAT_COLORS[cat] || { bg: T.mist, text: T.inkLight };
+  const c = catColor(cat);
   return <span style={{ background: c.bg, color: c.text, borderRadius: 20, padding: "2px 10px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>{cat}</span>;
 }
 
@@ -88,40 +110,45 @@ function Btn({ children, onClick, variant = "primary", style = {}, small = false
     secondary: { background: T.sageLight, color: T.sageDark },
     ghost: { background: "transparent", color: T.inkLight, border: `1px solid ${T.parchment}` },
     gold: { background: T.goldLight, color: T.gold },
-    rose: { background: T.dustyRoseLight, color: T.dustyRose },
-    danger: { background: "#FDE8E8", color: "#C0504D" },
   };
   return <button style={{ ...base, ...variants[variant], ...style }} onClick={onClick}>{children}</button>;
 }
 
 // ── Prayer Card ───────────────────────────────────────────────────────────────
-function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToList, myPrayingIds, onTogglePraying, activePrayMode = false, covered = false, onToggleCovered }) {
+function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToList, myPrayingIds, onTogglePraying, activePrayMode = false, covered = false, onToggleCovered, alreadyAdded = false }) {
   const [expanded, setExpanded] = useState(false);
   const days = daysBetween(prayer.date, today());
   const isPraying = myPrayingIds?.includes(prayer.id);
   const isAnswered = prayer.status === "answered";
+  const cats = Array.isArray(prayer.categories) ? prayer.categories : [prayer.categories].filter(Boolean);
+  const accent = isAnswered ? T.sage : primaryCatColor(cats);
+  // Only show the lock for prayers the user OWNS and marked private — never on friend-held prayers.
+  const showLock = mine && !prayer.fromFriend && !prayer.isPublic;
 
   const handleCover = (e) => { e.stopPropagation(); onToggleCovered && onToggleCovered(prayer.id); };
 
   return (
-    <Card style={{ padding: "11px 14px", marginBottom: 8, borderLeft: `3px solid ${covered ? T.sageLight : isAnswered ? T.sage : T.gold}`, opacity: covered ? 0.55 : 1, transition: "opacity 0.3s, border-color 0.3s" }}>
+    <Card style={{ padding: "11px 14px", marginBottom: 8, borderLeft: `4px solid ${covered ? T.sageLight : accent}`, opacity: covered ? 0.55 : 1, transition: "opacity 0.3s, border-color 0.3s" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         {activePrayMode && mine && !isAnswered ? (
           <button onClick={handleCover} style={{ width: 26, height: 26, borderRadius: "50%", border: `1.5px solid ${covered ? T.sage : T.sageLight}`, background: covered ? T.sage : "transparent", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, transition: "all 0.2s", padding: 0 }}>
             <span style={{ color: covered ? T.white : T.sageLight, fontSize: 10 }}>🙏</span>
           </button>
         ) : (
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: covered ? T.sageLight : isAnswered ? T.sage : T.gold, flexShrink: 0, marginLeft: 1 }} />
+          <div style={{ width: 9, height: 9, borderRadius: "50%", background: covered ? T.sageLight : accent, flexShrink: 0, marginLeft: 1 }} />
         )}
         <div style={{ flex: 1, cursor: "pointer", overflow: "hidden" }} onClick={() => setExpanded(!expanded)}>
-          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, fontSize: 16, color: covered ? T.inkLight : T.ink, lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: covered ? "line-through" : "none", textDecorationColor: T.sageLight, transition: "color 0.3s" }}>
+          {prayer.fromFriend && prayer.ownerName && (
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.sageDark, fontWeight: 500, marginBottom: 1 }}>{prayer.ownerName}'s Prayer</div>
+          )}
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, fontSize: 16, color: covered ? T.inkLight : T.ink, lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: covered ? "line-through" : "none", textDecorationColor: T.sageLight }}>
             {prayer.title}
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, cursor: "pointer" }} onClick={() => setExpanded(!expanded)}>
           {isAnswered && <span style={{ fontSize: 12, color: T.sage }}>✓</span>}
-          {mine && !prayer.isPublic && <span style={{ fontSize: 11 }}>🔒</span>}
-          <span style={{ fontSize: 10, color: T.inkLight, fontFamily: "'DM Sans', sans-serif" }}>{prayer.category.split(" ")[0]}</span>
+          {showLock && <span style={{ fontSize: 11 }}>🔒</span>}
+          <span style={{ fontSize: 10, color: T.inkLight, fontFamily: "'DM Sans', sans-serif" }}>{cats[0]?.split(" ")[0]}{cats.length > 1 ? ` +${cats.length - 1}` : ""}</span>
           <span style={{ color: T.parchment, fontSize: 14 }}>{expanded ? "▲" : "▾"}</span>
         </div>
       </div>
@@ -129,9 +156,9 @@ function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToLi
       {expanded && (
         <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.parchment}` }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-            <CategoryPill cat={prayer.category} />
+            {cats.map(c => <CategoryPill key={c} cat={c} />)}
             {isAnswered && <Badge label="✓ Answered" color={T.sage} />}
-            {mine && !prayer.isPublic && <Badge label="🔒 Private" color={T.inkLight} />}
+            {showLock && <Badge label="🔒 Private" color={T.inkLight} />}
             <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, alignSelf: "center" }}>{fmt(prayer.date)} · {days === 0 ? "Today" : `${days}d`}</span>
           </div>
           {prayer.note && <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, marginBottom: 12, lineHeight: 1.6 }}>{prayer.note}</p>}
@@ -144,7 +171,7 @@ function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToLi
           {!mine && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <Btn small variant={isPraying ? "secondary" : "ghost"} onClick={() => onTogglePraying(prayer.id)}>🙏 {isPraying ? "Praying" : "I'm Praying"} {prayer.praying > 0 && `(${prayer.praying})`}</Btn>
-              <Btn small variant="gold" onClick={() => onAddToList(prayer)}>+ My List</Btn>
+              <Btn small variant={alreadyAdded ? "secondary" : "gold"} onClick={() => onAddToList(prayer)}>{alreadyAdded ? "✓ On My List" : "+ My List"}</Btn>
             </div>
           )}
           {mine && prayer.status === "active" && (
@@ -167,20 +194,29 @@ function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToLi
 }
 
 // ── Add / Edit Prayer Modal ───────────────────────────────────────────────────
-function AddPrayerModal({ onClose, onAdd, editPrayer = null, friends = [] }) {
+function AddPrayerModal({ onClose, onAdd, editPrayer = null, friends = [], defaultPublic = true }) {
   const isEdit = !!editPrayer;
+  const initialCats = editPrayer ? (Array.isArray(editPrayer.categories) ? editPrayer.categories : [editPrayer.categories]) : ["Family"];
   const [title, setTitle] = useState(editPrayer?.title || "");
   const [note, setNote] = useState(editPrayer?.note || "");
-  const [cat, setCat] = useState(editPrayer?.category || "Family");
+  const [selectedCats, setSelectedCats] = useState(initialCats);
   const [customCat, setCustomCat] = useState("");
-  const [showCustom, setShowCustom] = useState(false);
-  const [isPublic, setIsPublic] = useState(editPrayer?.isPublic ?? true);
+  const [isPublic, setIsPublic] = useState(editPrayer ? editPrayer.isPublic : defaultPublic);
   const [sharedWith, setSharedWith] = useState([]);
 
   const cats = Object.keys(CAT_COLORS);
-  const handleCatSelect = (c) => { if (c === "__custom__") { setShowCustom(true); setCat(""); } else { setCat(c); setShowCustom(false); setCustomCat(""); } };
-  const finalCat = showCustom ? (customCat.trim() || "Other") : cat;
+  const toggleCat = (c) => setSelectedCats(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
+  const addCustomCat = () => {
+    const t = customCat.trim();
+    if (t && !selectedCats.includes(t)) { setSelectedCats(prev => [...prev, t]); setCustomCat(""); }
+  };
   const toggleFriend = (id) => setSharedWith(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
+  const submit = () => {
+    if (!title.trim()) return;
+    const finalCats = selectedCats.length ? selectedCats : ["Other"];
+    onAdd({ title: title.trim(), note, categories: finalCats, isPublic, sharedWith });
+  };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "flex-end" }}>
@@ -190,21 +226,36 @@ function AddPrayerModal({ onClose, onAdd, editPrayer = null, friends = [] }) {
         <input style={inputStyle} placeholder="A short title..." value={title} onChange={e => setTitle(e.target.value)} />
         <label style={labelStyle}>Notes (optional)</label>
         <textarea style={{ ...inputStyle, height: 80, resize: "none" }} placeholder="Add context, scripture, or details..." value={note} onChange={e => setNote(e.target.value)} />
-        <label style={labelStyle}>Category</label>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: showCustom ? 8 : 16 }}>
-          {cats.map(c => (
-            <button key={c} onClick={() => handleCatSelect(c)} style={{ border: `1.5px solid ${cat === c && !showCustom ? T.sageDark : T.parchment}`, background: cat === c && !showCustom ? T.sageLight : T.white, borderRadius: 20, padding: "5px 12px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", color: cat === c && !showCustom ? T.sageDark : T.inkLight, transition: "all 0.15s" }}>{c}</button>
+
+        <label style={labelStyle}>Categories (choose any)</label>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+          {cats.map(c => {
+            const on = selectedCats.includes(c);
+            const cc = catColor(c);
+            return (
+              <button key={c} onClick={() => toggleCat(c)} style={{ border: `1.5px solid ${on ? cc.text : T.parchment}`, background: on ? cc.bg : T.white, borderRadius: 20, padding: "5px 12px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", color: on ? cc.text : T.inkLight, fontWeight: on ? 500 : 400 }}>
+                {on ? "✓ " : ""}{c}
+              </button>
+            );
+          })}
+          {/* custom categories already chosen */}
+          {selectedCats.filter(c => !cats.includes(c)).map(c => (
+            <button key={c} onClick={() => toggleCat(c)} style={{ border: `1.5px solid ${T.sageDark}`, background: T.sageLight, borderRadius: 20, padding: "5px 12px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", color: T.sageDark, fontWeight: 500 }}>✓ {c}</button>
           ))}
-          <button onClick={() => handleCatSelect("__custom__")} style={{ border: `1.5px solid ${showCustom ? T.sageDark : T.parchment}`, background: showCustom ? T.sageLight : T.white, borderRadius: 20, padding: "5px 12px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", color: showCustom ? T.sageDark : T.inkLight }}>+ Custom</button>
         </div>
-        {showCustom && <input style={{ ...inputStyle, marginBottom: 16 }} placeholder="Enter custom category..." value={customCat} onChange={e => setCustomCat(e.target.value)} autoFocus />}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-          <div onClick={() => setIsPublic(!isPublic)} style={{ width: 44, height: 24, borderRadius: 12, background: isPublic ? T.sage : T.parchment, cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+          <input style={{ ...inputStyle, marginBottom: 0, flex: 1 }} placeholder="Add a custom category..." value={customCat} onChange={e => setCustomCat(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addCustomCat(); }} />
+          <Btn small variant="secondary" onClick={addCustomCat} style={{ flexShrink: 0 }}>Add</Btn>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: !isEdit && friends.length ? 12 : 20 }}>
+          <div onClick={() => setIsPublic(!isPublic)} style={{ width: 44, height: 24, borderRadius: 12, background: isPublic ? T.sage : T.parchment, cursor: "pointer", position: "relative", flexShrink: 0 }}>
             <div style={{ position: "absolute", top: 3, left: isPublic ? 22 : 3, width: 18, height: 18, borderRadius: "50%", background: T.white, transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }} />
           </div>
           <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight }}>{isPublic ? "Public — friends can see & pray" : "Private — just for you"}</span>
         </div>
-        {!isEdit && friends.length > 0 && (
+
+        {!isEdit && friends.length > 0 && isPublic && (
           <div style={{ marginBottom: 20 }}>
             <label style={labelStyle}>Share directly with (optional)</label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -216,8 +267,9 @@ function AddPrayerModal({ onClose, onAdd, editPrayer = null, friends = [] }) {
             </div>
           </div>
         )}
+
         <div style={{ display: "flex", gap: 10 }}>
-          <Btn style={{ flex: 1 }} onClick={() => { if (title.trim()) onAdd({ title: title.trim(), note, category: finalCat, isPublic, sharedWith }); }}>{isEdit ? "Save Changes" : "Add Prayer"}</Btn>
+          <Btn style={{ flex: 1 }} onClick={submit}>{isEdit ? "Save Changes" : "Add Prayer"}</Btn>
           <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
         </div>
       </div>
@@ -225,19 +277,19 @@ function AddPrayerModal({ onClose, onAdd, editPrayer = null, friends = [] }) {
   );
 }
 
-// ── Answer Modal ──────────────────────────────────────────────────────────────
+// ── Answer Modal (note now OPTIONAL) ──────────────────────────────────────────
 function AnswerModal({ prayer, onClose, onConfirm }) {
   const [note, setNote] = useState("");
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "flex-end" }}>
       <div style={{ background: T.cream, borderRadius: "20px 20px 0 0", padding: "24px 20px 36px", width: "100%", maxWidth: 480, margin: "0 auto" }}>
         <div style={{ fontSize: 32, textAlign: "center", marginBottom: 8 }}>🙌</div>
-        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 600, color: T.ink, marginBottom: 4, textAlign: "center" }}>Prayer Answered!</div>
+        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 600, color: T.ink, marginBottom: 4, textAlign: "center" }}>Celebrate this!</div>
         <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, textAlign: "center", marginBottom: 20 }}>"{prayer.title}"</div>
-        <label style={labelStyle}>What happened? (required)</label>
-        <textarea style={{ ...inputStyle, height: 100, resize: "none" }} placeholder="Share how God moved..." value={note} onChange={e => setNote(e.target.value)} />
+        <label style={labelStyle}>Want to remember what happened? (optional)</label>
+        <textarea style={{ ...inputStyle, height: 90, resize: "none" }} placeholder="Share how God moved — or just close it out." value={note} onChange={e => setNote(e.target.value)} />
         <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-          <Btn style={{ flex: 1 }} variant="secondary" onClick={() => { if (note.trim()) onConfirm(note.trim()); }}>Save & Close Out</Btn>
+          <Btn style={{ flex: 1 }} variant="secondary" onClick={() => onConfirm(note.trim() || null)}>{note.trim() ? "Save & Celebrate" : "Mark Answered"}</Btn>
           <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
         </div>
       </div>
@@ -246,7 +298,8 @@ function AnswerModal({ prayer, onClose, onConfirm }) {
 }
 
 // ── My Prayers Tab ────────────────────────────────────────────────────────────
-function MyPrayers({ prayers, setPrayers, friends, firstName }) {
+function MyPrayers({ prayers, setPrayers, friends, firstName, defaultPublic }) {
+  const showToast = useToast();
   const [showAdd, setShowAdd] = useState(false);
   const [answerTarget, setAnswerTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
@@ -257,41 +310,48 @@ function MyPrayers({ prayers, setPrayers, friends, firstName }) {
   const [activePrayMode, setActivePrayMode] = useState(false);
   const [coveredIds, setCoveredIds] = useState([]);
 
+  const catsOf = (p) => Array.isArray(p.categories) ? p.categories : [p.categories].filter(Boolean);
   const active = prayers.filter(p => p.status === "active");
   const answered = prayers.filter(p => p.status === "answered");
-  const allCats = ["All", ...Array.from(new Set([...Object.keys(CAT_COLORS), ...prayers.map(p => p.category)]))];
+  const allCats = ["All", ...Array.from(new Set(prayers.flatMap(catsOf).concat(Object.keys(CAT_COLORS))))];
 
   let shown = statusFilter === "active" ? active : answered;
-  if (catFilter !== "All") shown = shown.filter(p => p.category === catFilter);
+  if (catFilter !== "All") shown = shown.filter(p => catsOf(p).includes(catFilter));
   shown = [...shown].sort((a, b) => {
     if (sort === "newest") return new Date(b.date) - new Date(a.date);
-    if (sort === "oldest") return new Date(a.date) - new Date(b.date);
-    if (sort === "longest") return new Date(a.date) - new Date(b.date);
+    if (sort === "oldest" || sort === "longest") return new Date(a.date) - new Date(b.date);
     if (sort === "az") return a.title.localeCompare(b.title);
     return 0;
   });
 
+  // Split into your own prayers vs. ones you're holding for others (#14 divider)
+  const mineOwn = shown.filter(p => !p.fromFriend);
+  const heldForOthers = shown.filter(p => p.fromFriend);
+
   const coveredCount = coveredIds.filter(id => shown.find(p => p.id === id)).length;
 
-  const addPrayer = ({ title, note, category, isPublic }) => {
-    setPrayers(prev => [{ id: Date.now(), title, note, category, isPublic, status: "active", date: today(), answeredNote: null, praying: 0 }, ...prev]);
+  const addPrayer = ({ title, note, categories, isPublic }) => {
+    setPrayers(prev => [{ id: Date.now(), title, note, categories, isPublic, status: "active", date: today(), answeredNote: null, praying: 0, fromFriend: false, ownerName: null }, ...prev]);
     setShowAdd(false);
+    showToast("Prayer added");
   };
-
-  const savePrayer = ({ title, note, category, isPublic }) => {
-    setPrayers(prev => prev.map(p => p.id === editTarget.id ? { ...p, title, note, category, isPublic } : p));
+  const savePrayer = ({ title, note, categories, isPublic }) => {
+    setPrayers(prev => prev.map(p => p.id === editTarget.id ? { ...p, title, note, categories, isPublic } : p));
     setEditTarget(null);
+    showToast("Changes saved");
   };
-
-  const deletePrayer = (id) => setPrayers(prev => prev.filter(p => p.id !== id));
-
+  const deletePrayer = (id) => { setPrayers(prev => prev.filter(p => p.id !== id)); showToast("Prayer removed"); };
   const markAnswered = (note) => {
     setPrayers(prev => prev.map(p => p.id === answerTarget.id ? { ...p, status: "answered", answeredNote: note } : p));
     setAnswerTarget(null);
+    showToast("Celebrating with you 🙌");
   };
-
   const toggleCovered = (id) => setCoveredIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const endSession = () => { setActivePrayMode(false); setCoveredIds([]); };
+
+  const renderCard = (p) => (
+    <PrayerCard key={p.id} prayer={p} mine onAnswer={setAnswerTarget} onDelete={deletePrayer} onEdit={setEditTarget} activePrayMode={activePrayMode} covered={coveredIds.includes(p.id)} onToggleCovered={toggleCovered} />
+  );
 
   return (
     <div style={tabContent}>
@@ -319,7 +379,7 @@ function MyPrayers({ prayers, setPrayers, friends, firstName }) {
 
       <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center" }}>
         {["active", "answered"].map(f => (
-          <button key={f} onClick={() => setStatusFilter(f)} style={{ border: "none", borderRadius: 20, padding: "6px 14px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", background: statusFilter === f ? T.sageDark : T.parchment, color: statusFilter === f ? T.white : T.inkLight, transition: "all 0.15s" }}>
+          <button key={f} onClick={() => setStatusFilter(f)} style={{ border: "none", borderRadius: 20, padding: "6px 14px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", background: statusFilter === f ? T.sageDark : T.parchment, color: statusFilter === f ? T.white : T.inkLight }}>
             {f === "active" ? `Active (${active.length})` : `Answered (${answered.length})`}
           </button>
         ))}
@@ -356,12 +416,23 @@ function MyPrayers({ prayers, setPrayers, friends, firstName }) {
         </div>
       )}
 
-      {shown.map(p => (
-        <PrayerCard key={p.id} prayer={p} mine onAnswer={setAnswerTarget} onDelete={deletePrayer} onEdit={setEditTarget} activePrayMode={activePrayMode} covered={coveredIds.includes(p.id)} onToggleCovered={toggleCovered} />
-      ))}
+      {/* Your own prayers */}
+      {mineOwn.map(renderCard)}
 
-      {showAdd && <AddPrayerModal onClose={() => setShowAdd(false)} onAdd={addPrayer} friends={friends} />}
-      {editTarget && <AddPrayerModal onClose={() => setEditTarget(null)} onAdd={savePrayer} editPrayer={editTarget} friends={friends} />}
+      {/* Divider + prayers held for others (#14) */}
+      {heldForOthers.length > 0 && (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "20px 4px 14px" }}>
+            <div style={{ flex: 1, height: 1, background: T.parchment }} />
+            <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase" }}>Holding for Others</span>
+            <div style={{ flex: 1, height: 1, background: T.parchment }} />
+          </div>
+          {heldForOthers.map(renderCard)}
+        </>
+      )}
+
+      {showAdd && <AddPrayerModal onClose={() => setShowAdd(false)} onAdd={addPrayer} friends={friends} defaultPublic={defaultPublic} />}
+      {editTarget && <AddPrayerModal onClose={() => setEditTarget(null)} onAdd={savePrayer} editPrayer={editTarget} friends={friends} defaultPublic={defaultPublic} />}
       {answerTarget && <AnswerModal prayer={answerTarget} onClose={() => setAnswerTarget(null)} onConfirm={markAnswered} />}
     </div>
   );
@@ -369,12 +440,50 @@ function MyPrayers({ prayers, setPrayers, friends, firstName }) {
 
 // ── Feed Tab ──────────────────────────────────────────────────────────────────
 function Feed({ friends, myPrayers, setMyPrayers }) {
+  const showToast = useToast();
   const [prayingIds, setPrayingIds] = useState([]);
-  const togglePraying = (id) => setPrayingIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  const addToList = (prayer) => {
-    if (myPrayers.find(p => p.title === prayer.title)) return;
-    setMyPrayers(prev => [{ ...prayer, id: Date.now(), isPublic: false, status: "active", date: today(), answeredNote: null, praying: 0 }, ...prev]);
+  const togglePraying = (id) => {
+    const adding = !prayingIds.includes(id);
+    setPrayingIds(prev => adding ? [...prev, id] : prev.filter(x => x !== id));
+    if (adding) showToast("They'll know you're praying 🙏");
   };
+
+  // track which friend prayers are already on my list, by a stable source key
+  const addedKeys = myPrayers.filter(p => p.fromFriend).map(p => p.sourceKey);
+  const keyFor = (friend, p) => `${friend.id}-${p.id}`;
+
+  const addToList = (friend, prayer) => {
+    const key = keyFor(friend, prayer);
+    if (addedKeys.includes(key)) { showToast("Already on your list"); return; }
+    setMyPrayers(prev => [{
+      ...prayer,
+      id: Date.now() + Math.random(),
+      sourceKey: key,
+      isPublic: false,
+      status: "active",
+      date: today(),
+      answeredNote: null,
+      praying: 0,
+      fromFriend: true,
+      ownerName: friend.name.split(" ")[0],
+    }, ...prev]);
+    showToast(`Added ${friend.name.split(" ")[0]}'s prayer to your list`);
+  };
+
+  const addAll = (friend) => {
+    const toAdd = friend.prayers.filter(p => p.status === "active" && !addedKeys.includes(keyFor(friend, p)));
+    if (!toAdd.length) { showToast("All already on your list"); return; }
+    setMyPrayers(prev => [
+      ...toAdd.map(prayer => ({
+        ...prayer, id: Date.now() + Math.random(), sourceKey: keyFor(friend, prayer),
+        isPublic: false, status: "active", date: today(), answeredNote: null, praying: 0,
+        fromFriend: true, ownerName: friend.name.split(" ")[0],
+      })),
+      ...prev,
+    ]);
+    showToast(`Added ${toAdd.length} of ${friend.name.split(" ")[0]}'s prayers`);
+  };
+
   return (
     <div style={tabContent}>
       <div style={{ marginBottom: 20 }}>
@@ -385,13 +494,14 @@ function Feed({ friends, myPrayers, setMyPrayers }) {
         <div key={friend.id} style={{ marginBottom: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
             <Avatar initials={friend.avatar} />
-            <div>
+            <div style={{ flex: 1 }}>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: T.ink }}>{friend.name}</div>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{friend.prayers.length} shared prayer{friend.prayers.length !== 1 ? "s" : ""}</div>
             </div>
+            <Btn small variant="ghost" onClick={() => addAll(friend)}>+ Add All</Btn>
           </div>
           {friend.prayers.map(p => (
-            <PrayerCard key={p.id} prayer={p} mine={false} myPrayingIds={prayingIds} onTogglePraying={togglePraying} onAddToList={addToList} />
+            <PrayerCard key={p.id} prayer={p} mine={false} myPrayingIds={prayingIds} onTogglePraying={togglePraying} onAddToList={(pr) => addToList(friend, pr)} alreadyAdded={addedKeys.includes(keyFor(friend, p))} />
           ))}
         </div>
       ))}
@@ -407,6 +517,7 @@ function Friends({ friends }) {
     { id: 10, name: "Marcus T.", avatar: "MT", mutual: 2 },
     { id: 11, name: "Grace L.", avatar: "GL", mutual: 1 },
   ];
+  const catsOf = (p) => Array.isArray(p.categories) ? p.categories : [p.categories].filter(Boolean);
   return (
     <div style={tabContent}>
       <div style={{ marginBottom: 20 }}><div style={pageTitle}>Friends</div></div>
@@ -439,12 +550,13 @@ function Friends({ friends }) {
 
 // ── Dashboard Tab ─────────────────────────────────────────────────────────────
 function Dashboard({ prayers }) {
+  const catsOf = (p) => Array.isArray(p.categories) ? p.categories : [p.categories].filter(Boolean);
   const active = prayers.filter(p => p.status === "active").length;
   const answered = prayers.filter(p => p.status === "answered").length;
   const total = prayers.length;
   const pct = total ? Math.round((answered / total) * 100) : 0;
   const streak = 14;
-  const catCounts = Object.keys(CAT_COLORS).map(cat => ({ cat, count: prayers.filter(p => p.category === cat).length })).filter(x => x.count > 0).sort((a, b) => b.count - a.count);
+  const catCounts = Object.keys(CAT_COLORS).map(cat => ({ cat, count: prayers.filter(p => catsOf(p).includes(cat)).length })).filter(x => x.count > 0).sort((a, b) => b.count - a.count);
   const maxCat = catCounts[0]?.count || 1;
   const recentAnswered = prayers.filter(p => p.status === "answered").slice(0, 3);
 
@@ -476,7 +588,7 @@ function Dashboard({ prayers }) {
         <Card>
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, marginBottom: 12 }}>By Category</div>
           {catCounts.map(({ cat, count }) => {
-            const c = CAT_COLORS[cat] || { text: T.sage };
+            const c = catColor(cat);
             return (
               <div key={cat} style={{ marginBottom: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
@@ -506,10 +618,13 @@ function Dashboard({ prayers }) {
   );
 }
 
-// ── Profile Tab ───────────────────────────────────────────────────────────────
-function Profile({ prayers, user }) {
+// ── Profile Tab (default-private toggle now WORKS via props) ──────────────────
+function Profile({ prayers, user, defaultPublic, setDefaultPublic }) {
   const [notifications, setNotifications] = useState(true);
-  const [defaultPublic, setDefaultPublic] = useState(true);
+  const settings = [
+    { label: "Prayer reminders", sub: "Daily nudge to check in", val: notifications, set: setNotifications },
+    { label: "Default to private", sub: "New prayers start private", val: !defaultPublic, set: (v) => setDefaultPublic(!v) },
+  ];
   return (
     <div style={tabContent}>
       <div style={{ marginBottom: 24 }}><div style={pageTitle}>Profile</div></div>
@@ -521,13 +636,13 @@ function Profile({ prayers, user }) {
         </div>
       </div>
       <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10 }}>Settings</div>
-      {[{ label: "Prayer reminders", sub: "Daily nudge to check in", val: notifications, set: setNotifications }, { label: "Default to public", sub: "New prayers visible to friends", val: defaultPublic, set: setDefaultPublic }].map(({ label, sub, val, set }) => (
+      {settings.map(({ label, sub, val, set }) => (
         <Card key={label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 14, color: T.ink }}>{label}</div>
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{sub}</div>
           </div>
-          <div onClick={() => set(!val)} style={{ width: 44, height: 24, borderRadius: 12, background: val ? T.sage : T.parchment, cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+          <div onClick={() => set(!val)} style={{ width: 44, height: 24, borderRadius: 12, background: val ? T.sage : T.parchment, cursor: "pointer", position: "relative", flexShrink: 0 }}>
             <div style={{ position: "absolute", top: 3, left: val ? 22 : 3, width: 18, height: 18, borderRadius: "50%", background: T.white, transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }} />
           </div>
         </Card>
@@ -554,26 +669,15 @@ function SignIn({ onSignIn }) {
   return (
     <div style={{ minHeight: "100vh", background: T.cream, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32 }}>
       <div style={{ fontSize: 52, marginBottom: 16 }}>🕊️</div>
-      <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 40, fontWeight: 300, color: T.ink, letterSpacing: -1, marginBottom: 8 }}>Amen</div>
-      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: T.inkLight, textAlign: "center", maxWidth: 260, lineHeight: 1.6, marginBottom: 32 }}>A quiet place to pray, share, and remember how God moves.</div>
-      <input
-        style={{ ...inputStyle, maxWidth: 280, textAlign: "center", marginBottom: 12 }}
-        placeholder="What's your first name?"
-        value={name}
-        onChange={e => setName(e.target.value)}
-        onKeyDown={e => { if (e.key === "Enter" && name.trim()) onSignIn(name.trim()); }}
-      />
-      <button
-        onClick={() => { if (name.trim()) onSignIn(name.trim()); }}
-        style={{ background: name.trim() ? T.sageDark : T.sageLight, color: T.white, border: "none", borderRadius: 14, padding: "14px 40px", cursor: name.trim() ? "pointer" : "default", fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 500, transition: "background 0.2s", opacity: name.trim() ? 1 : 0.6 }}>
-        Enter
-      </button>
+      <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 40, fontWeight: 300, color: T.ink, letterSpacing: -1, marginBottom: 8 }}>LIFT</div>
+      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: T.inkLight, textAlign: "center", maxWidth: 270, lineHeight: 1.6, marginBottom: 32 }}>A quiet place to bring your prayers, hold others up, and remember how God moves.</div>
+      <input style={{ ...inputStyle, maxWidth: 280, textAlign: "center", marginBottom: 12 }} placeholder="What's your first name?" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && name.trim()) onSignIn(name.trim()); }} />
+      <button onClick={() => { if (name.trim()) onSignIn(name.trim()); }} style={{ background: name.trim() ? T.sageDark : T.sageLight, color: T.white, border: "none", borderRadius: 14, padding: "14px 40px", cursor: name.trim() ? "pointer" : "default", fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 500, opacity: name.trim() ? 1 : 0.6 }}>Enter</button>
       <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, marginTop: 32, textAlign: "center" }}>Your prayers stay private unless you choose to share them.</div>
     </div>
   );
 }
 
-// ── Bottom Nav ────────────────────────────────────────────────────────────────
 const TABS = [
   { id: "prayers", icon: "🙏", label: "Prayers" },
   { id: "feed", icon: "🕊️", label: "Feed" },
@@ -596,33 +700,29 @@ function BottomNav({ active, setActive }) {
   );
 }
 
-// ── Root App ──────────────────────────────────────────────────────────────────
 export default function App() {
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState("prayers");
   const [prayers, setPrayers] = useState(SEED_PRAYERS);
   const [friends] = useState(SEED_FRIENDS);
+  const [defaultPublic, setDefaultPublic] = useState(true);
 
-  if (!user) return (
-    <>
-      <FontLink />
-      <SignIn onSignIn={(name) => setUser({ name })} />
-    </>
-  );
-
+  if (!user) return (<><FontLink /><SignIn onSignIn={(name) => setUser({ name })} /></>);
   const firstName = user.name.split(" ")[0];
 
   return (
     <>
       <FontLink />
-      <div style={{ minHeight: "100vh", background: T.cream }}>
-        {tab === "prayers" && <MyPrayers prayers={prayers} setPrayers={setPrayers} friends={friends} firstName={firstName} />}
-        {tab === "feed" && <Feed friends={friends} myPrayers={prayers} setMyPrayers={setPrayers} />}
-        {tab === "friends" && <Friends friends={friends} />}
-        {tab === "dashboard" && <Dashboard prayers={prayers} />}
-        {tab === "profile" && <Profile prayers={prayers} user={user} />}
-        <BottomNav active={tab} setActive={setTab} />
-      </div>
+      <ToastProvider>
+        <div style={{ minHeight: "100vh", background: T.cream }}>
+          {tab === "prayers" && <MyPrayers prayers={prayers} setPrayers={setPrayers} friends={friends} firstName={firstName} defaultPublic={defaultPublic} />}
+          {tab === "feed" && <Feed friends={friends} myPrayers={prayers} setMyPrayers={setPrayers} />}
+          {tab === "friends" && <Friends friends={friends} />}
+          {tab === "dashboard" && <Dashboard prayers={prayers} />}
+          {tab === "profile" && <Profile prayers={prayers} user={user} defaultPublic={defaultPublic} setDefaultPublic={setDefaultPublic} />}
+          <BottomNav active={tab} setActive={setTab} />
+        </div>
+      </ToastProvider>
     </>
   );
 }
