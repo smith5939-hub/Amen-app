@@ -716,30 +716,65 @@ function SignIn() {
   );
 }
 
+function EncouragementModal({ prayer, prayerName, onSend, onSkip }) {
+  const [note, setNote] = useState("");
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "flex-end" }}>
+      <div style={{ background: T.cream, borderRadius: "20px 20px 0 0", padding: "24px 20px 36px", width: "100%", maxWidth: 480, margin: "0 auto" }}>
+        <div style={{ fontSize: 32, textAlign: "center", marginBottom: 8 }}>🙏</div>
+        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 600, color: T.ink, marginBottom: 4, textAlign: "center" }}>Praying for {prayerName}</div>
+        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, textAlign: "center", marginBottom: 20 }}>"{prayer.title}"</div>
+        <label style={labelStyle}>Add an encouragement note (optional)</label>
+        <textarea style={{ ...inputStyle, height: 80, resize: "none" }} placeholder="Let them know you're with them..." value={note} onChange={e => setNote(e.target.value)} />
+        <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+          <Btn style={{ flex: 1 }} variant="secondary" onClick={() => onSend(note.trim() || null)}>{note.trim() ? "Send & Pray" : "Start Praying"}</Btn>
+          <Btn variant="ghost" onClick={onSkip}>Skip</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequests, onAccept, onDecline, onSendRequest }) {
   const showToast = useToast();
   const [prayingIds, setPrayingIds] = useState([]);
   const [friendsOpen, setFriendsOpen] = useState(false);
+  const [encourageTarget, setEncourageTarget] = useState(null);
   const [search, setSearch] = useState("");
   const [searchResult, setSearchResult] = useState(null);
   const [searching, setSearching] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
 
-  const togglePraying = async (prayer) => {
+  const submitPraying = async (prayer, note) => {
     const id = prayer.id;
-    const adding = !prayingIds.includes(id);
-    setPrayingIds(prev => adding ? [...prev, id] : prev.filter(x => x !== id));
-    if (adding) {
-      showToast("They'll know you're praying 🙏");
-      await addDoc(collection(db, "prayingRecords"), {
-        prayerOwnerId: prayer.userId,
-        prayerTitle: prayer.title,
-        prayingUserId: currentUser.uid,
-        prayerName: currentUser.displayName?.split(" ")[0] || "A friend",
-        prayerId: id,
+    setPrayingIds(prev => [...prev, id]);
+    setEncourageTarget(null);
+    showToast("They'll know you're praying 🙏");
+    await addDoc(collection(db, "prayingRecords"), {
+      prayerOwnerId: prayer.userId,
+      prayerTitle: prayer.title,
+      prayingUserId: currentUser.uid,
+      prayerName: currentUser.displayName?.split(" ")[0] || "A friend",
+      prayerId: id,
+      note: note || null,
+      createdAt: new Date().toISOString(),
+    });
+    if (note) {
+      await addDoc(collection(db, "notifications"), {
+        toUid: prayer.userId,
+        title: "💬 Encouragement from " + (currentUser.displayName?.split(" ")[0] || "a friend"),
+        body: note,
+        type: "encouragement",
+        read: false,
         createdAt: new Date().toISOString(),
       });
     }
+  };
+
+  const togglePraying = (prayer) => {
+    const id = prayer.id;
+    if (prayingIds.includes(id)) return;
+    setEncourageTarget(prayer);
   };
 
   const addedKeys = myPrayers.filter(p => p.fromFriend).map(p => p.sourceKey);
@@ -905,6 +940,14 @@ function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequest
           )}
         </div>
       ))}
+      {encourageTarget && (
+        <EncouragementModal
+          prayer={encourageTarget}
+          prayerName={friends.find(f => f.uid === encourageTarget.userId)?.displayName?.split(" ")[0] || "them"}
+          onSend={(note) => submitPraying(encourageTarget, note)}
+          onSkip={() => { submitPraying(encourageTarget, null); }}
+        />
+      )}
     </div>
   );
 }
