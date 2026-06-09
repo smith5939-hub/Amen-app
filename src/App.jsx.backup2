@@ -521,7 +521,7 @@ function Friends({ currentUser, friends, incomingRequests, onAccept, onDecline, 
 
       {searchResult && (
         <Card style={{ marginBottom: 20 }}>
-{searchResult.notFound && (
+Result not (
   <div>
     <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, marginBottom: 12 }}>Not on LIFT yet.</div>
     <Btn small variant="secondary" onClick={() => {
@@ -530,8 +530,7 @@ function Friends({ currentUser, friends, incomingRequests, onAccept, onDecline, 
       window.open(`mailto:${search}?subject=${subject}&body=${body}`);
     }}>✉️ Send Invite</Btn>
   </div>
-)}  
-{searchResult.isSelf && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight }}>That's you! 😄</div>}
+)          {searchResult.isSelf && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight }}>That's you! 😄</div>}
           {searchResult.alreadyFriend && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.sageDark }}>You're already friends with {searchResult.user.displayName}! 🙏</div>}
           {searchResult.error && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.dustyRose }}>Something went wrong. Try again.</div>}
           {searchResult.user && !searchResult.alreadyFriend && !searchResult.isSelf && (
