@@ -527,7 +527,7 @@ function Friends({ currentUser, friends, incomingRequests, onAccept, onDecline, 
     <Btn small variant="secondary" onClick={() => {
       const subject = encodeURIComponent("Join me on LIFT");
       const body = encodeURIComponent(`Hey! I've been using LIFT to track my prayers and I'd love to pray together. Join me here: https://amen-app-two.vercel.app`);
-      window.open(`mailto:${search}?subject=${subject}&body=${body}`);
+      window.open(`https://mail.google.com/mail/?view=cm&to=${search}&su=${subject}&body=${body}`);
     }}>✉️ Send Invite</Btn>
   </div>
 )}  
