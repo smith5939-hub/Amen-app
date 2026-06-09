@@ -14,7 +14,18 @@ const VAPID_PRIVATE = "xr3Ga8Yj2WGonS1RfgbIUn8rN1Ox2CBP5V_QjWI5Gi8";
 
 webpush.setVapidDetails("mailto:smith.5939@gmail.com", VAPID_PUBLIC, VAPID_PRIVATE);
 
-async function sendPushToUser(userId, title, body) {
+async function sendPushToUser(userId, title, body, type = "general") {
+  // Write to Firestore notifications collection
+  await db.collection("notifications").add({
+    toUid: userId,
+    title,
+    body,
+    type,
+    read: false,
+    createdAt: new Date().toISOString(),
+  });
+
+  // Send push notification if subscription exists
   const subsSnap = await db.collection("pushSubscriptions").where("userId", "==", userId).get();
   if (subsSnap.empty) return;
   const payload = JSON.stringify({ title, body });
@@ -38,7 +49,7 @@ exports.dailyPrayerReminder = onSchedule("every day 10:00", async () => {
     const activitySnap = await db.collection("userActivity").doc(userId).get();
     const lastActive = activitySnap.exists ? new Date(activitySnap.data().lastActive) : null;
     if (!lastActive || lastActive < cutoff) {
-      await sendPushToUser(userId, "🙏 Time to pray", "Your prayer list is waiting. Take a moment to lift them up.");
+      await sendPushToUser(userId, "🙏 Time to pray", "Your prayer list is waiting. Take a moment to lift them up.", "reminder");
     }
   }
 });
@@ -50,19 +61,19 @@ exports.prayerDateReminder = onSchedule("every day 08:00", async () => {
   const prayersSnap = await db.collection("prayers").where("prayerDate", "==", tomorrowStr).where("status", "==", "active").get();
   for (const prayerDoc of prayersSnap.docs) {
     const prayer = prayerDoc.data();
-    await sendPushToUser(prayer.userId, "📅 Prayer date tomorrow", `"${prayer.title}" — tomorrow is the day. Praying with you.`);
+    await sendPushToUser(prayer.userId, "📅 Prayer date tomorrow", `"${prayer.title}" — tomorrow is the day. Praying with you.`, "reminder");
   }
 });
 
 exports.friendRequestNotification = onDocumentCreated("friendRequests/{requestId}", async (event) => {
   const request = event.data.data();
   if (!request || request.status !== "pending") return;
-  await sendPushToUser(request.toUid, "👥 New friend request", `${request.fromName || "Someone"} wants to pray with you on LIFT.`);
+  await sendPushToUser(request.toUid, "👥 New friend request", `${request.fromName || "Someone"} wants to pray with you on LIFT.`, "friend_request");
 });
 
 exports.prayedForNotification = onDocumentCreated("prayingRecords/{recordId}", async (event) => {
   const record = event.data.data();
   if (!record) return;
   const { prayerOwnerId, prayerTitle, prayerName } = record;
-  await sendPushToUser(prayerOwnerId, "🙏 Someone is praying for you", `${prayerName || "A friend"} is praying for "${prayerTitle}"`);
+  await sendPushToUser(prayerOwnerId, "🙏 Someone is praying for you", `${prayerName || "A friend"} is praying for "${prayerTitle}"`, "prayed_for");
 });
