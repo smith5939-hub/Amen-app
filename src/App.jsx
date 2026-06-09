@@ -2,7 +2,6 @@ import { useState, useEffect, createContext, useContext } from "react";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "firebase/auth";
 import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs } from "firebase/firestore";
-import { getMessaging, getToken } from "firebase/messaging";
 
 const FontLink = () => {
   useEffect(() => {
@@ -757,16 +756,24 @@ export default function App() {
         await setDoc(doc(db, "userActivity", firebaseUser.uid), {
           lastActive: new Date().toISOString(),
         }, { merge: true });
-// Bucket 3 — register FCM token
+// Bucket 3 — Web Push subscription
         try {
-          const { messaging, VAPID_KEY } = await import("./firebase");
           const swReg = await navigator.serviceWorker.ready;
-          const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
-          if (token) {
-            await setDoc(doc(db, "fcmTokens", token), { userId: firebaseUser.uid, token, updatedAt: new Date().toISOString() });
+          const permission = await Notification.requestPermission();
+          if (permission === "granted") {
+            const existing = await swReg.pushManager.getSubscription();
+            const sub = existing || await swReg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: "BPUZCKpCFVDRD8xxpwxURabMud5HsEhcLdpnRXh7yLMENcegDeTuGJbN9hMwue4mKJIoq_tQrTUZpYxJJK5n_So"
+            });
+            await setDoc(doc(db, "pushSubscriptions", firebaseUser.uid), {
+              userId: firebaseUser.uid,
+              subscription: JSON.parse(JSON.stringify(sub)),
+              updatedAt: new Date().toISOString()
+            });
           }
         } catch (e) {
-          console.log("FCM token error:", e);
+          console.log("Push subscription error:", e);
         }
       }
     });
