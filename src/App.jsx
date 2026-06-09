@@ -94,7 +94,7 @@ function Btn({ children, onClick, variant = "primary", style = {}, small = false
   return <button style={{ ...base, ...variants[variant], ...style }} onClick={disabled ? undefined : onClick}>{children}</button>;
 }
 
-function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToList, myPrayingIds, onTogglePraying, activePrayMode = false, covered = false, onToggleCovered, alreadyAdded = false }) {
+function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToList, myPrayingIds, onTogglePraying, activePrayMode = false, covered = false, onToggleCovered, alreadyAdded = false, friends = [] }) {
   const [expanded, setExpanded] = useState(false);
   const days = daysBetween(prayer.date, today());
   const isPraying = myPrayingIds?.includes(prayer.id);
@@ -115,8 +115,8 @@ function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToLi
           <div style={{ width: 9, height: 9, borderRadius: "50%", background: covered ? T.sageLight : accent, flexShrink: 0, marginLeft: 1 }} />
         )}
         <div style={{ flex: 1, cursor: "pointer", overflow: "hidden" }} onClick={() => setExpanded(!expanded)}>
-          {prayer.fromFriend && prayer.ownerName && (
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.sageDark, fontWeight: 500, marginBottom: 1 }}>{prayer.ownerName}'s Prayer</div>
+          {prayer.fromFriend && (
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.sageDark, fontWeight: 500, marginBottom: 1 }}>{(friends.find(f => f.uid === prayer.userId)?.displayName) || prayer.ownerName || "Friend"}'s Prayer</div>
           )}
           <div style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, fontSize: 16, color: covered ? T.inkLight : T.ink, lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: covered ? "line-through" : "none", textDecorationColor: T.sageLight }}>
             {prayer.title}
@@ -298,7 +298,7 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
   const toggleCovered = (id) => setCoveredIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const endSession = () => { setActivePrayMode(false); setCoveredIds([]); };
   const renderCard = (p) => (
-    <PrayerCard key={p.id} prayer={p} mine onAnswer={setAnswerTarget} onDelete={handleDelete} onEdit={setEditTarget} activePrayMode={activePrayMode} covered={coveredIds.includes(p.id)} onToggleCovered={toggleCovered} />
+    <PrayerCard key={p.id} prayer={p} mine onAnswer={setAnswerTarget} onDelete={handleDelete} onEdit={setEditTarget} activePrayMode={activePrayMode} covered={coveredIds.includes(p.id)} onToggleCovered={toggleCovered} friends={friends} />
   );
   return (
     <div style={tabContent}>
