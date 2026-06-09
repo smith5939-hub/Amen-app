@@ -752,6 +752,26 @@ export default function App() {
         }, { merge: true });
       }
       setUser(firebaseUser || null);
+      if (firebaseUser) {
+        // Track activity
+        await setDoc(doc(db, "userActivity", firebaseUser.uid), {
+          lastActive: new Date().toISOString(),
+        }, { merge: true });
+        // Request notification permission
+        try {
+          const { messaging, VAPID_KEY } = await import("./firebase");
+          const token = await getToken(messaging, { vapidKey: VAPID_KEY });
+          if (token) {
+            await setDoc(doc(db, "fcmTokens", token), {
+              userId: firebaseUser.uid,
+              token,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        } catch (e) {
+          console.log("Notification permission denied or error:", e);
+        }
+      }
     });
     return unsub;
   }, []);
