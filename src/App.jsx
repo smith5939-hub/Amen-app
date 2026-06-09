@@ -760,7 +760,10 @@ export default function App() {
         // Request notification permission
         try {
           const { messaging, VAPID_KEY } = await import("./firebase");
-          const token = await getToken(messaging, { vapidKey: VAPID_KEY });
+          const token = await getToken(messaging, { 
+  vapidKey: VAPID_KEY,
+  serviceWorkerRegistration: await navigator.serviceWorker.register('/firebase-messaging-sw.js')
+});
           if (token) {
             await setDoc(doc(db, "fcmTokens", token), {
               userId: firebaseUser.uid,
