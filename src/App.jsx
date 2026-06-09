@@ -760,6 +760,7 @@ export default function App() {
         // Request notification permission
         try {
           const { messaging, VAPID_KEY } = await import("./firebase");
+          await firebaseUser.getIdToken(true);
           const permission = await Notification.requestPermission();
           if (permission !== 'granted') throw new Error('Notification permission not granted');
           const swReg = await navigator.serviceWorker.ready;
