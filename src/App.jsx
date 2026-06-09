@@ -757,8 +757,6 @@ export default function App() {
           lastActive: new Date().toISOString(),
         }, { merge: true });
 // TODO: Bucket 3 — push notifications via Cloud Function
-          console.log("Notification permission denied or error:", e);
-        }
       }
     });
     return unsub;
