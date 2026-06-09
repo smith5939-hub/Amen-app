@@ -762,7 +762,7 @@ export default function App() {
           const { messaging, VAPID_KEY } = await import("./firebase");
           const token = await getToken(messaging, { 
   vapidKey: VAPID_KEY,
-  serviceWorkerRegistration: await navigator.serviceWorker.register('/firebase-messaging-sw.js')
+  serviceWorkerRegistration: await navigator.serviceWorker.ready
 });
           if (token) {
             await setDoc(doc(db, "fcmTokens", token), {
