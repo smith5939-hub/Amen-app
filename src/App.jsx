@@ -1,7 +1,7 @@
 import { useState, useEffect, createContext, useContext } from "react";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "firebase/auth";
-import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs } from "firebase/firestore";
 
 const FontLink = () => {
   useEffect(() => {
@@ -30,20 +30,6 @@ const CAT_COLORS = {
 };
 const catColor = (cat) => CAT_COLORS[cat] || { bg: T.mist, text: T.inkLight };
 const primaryCatColor = (cats) => catColor(Array.isArray(cats) ? cats[0] : cats).text;
-
-const SEED_FRIENDS = [
-  { id: 1, name: "Sarah M.", avatar: "SM", prayers: [
-    { id: 101, title: "My brother's addiction", categories: ["Family"], note: "Been praying for James for 2 years.", isPublic: true, status: "active", date: "2025-03-01", praying: 12 },
-    { id: 102, title: "New apartment", categories: ["Finances"], note: "Lease is up end of June.", isPublic: true, status: "answered", date: "2025-04-20", answeredNote: "Found the perfect place under budget!", praying: 8 },
-  ]},
-  { id: 2, name: "David K.", avatar: "DK", prayers: [
-    { id: 201, title: "Seminary acceptance", categories: ["Spiritual Growth"], note: "Applied to three programs. Surrendering the outcome.", isPublic: true, status: "active", date: "2025-05-05", praying: 5 },
-  ]},
-  { id: 3, name: "Priya R.", avatar: "PR", prayers: [
-    { id: 301, title: "Dad's heart health", categories: ["Health"], note: "Procedure scheduled for next month.", isPublic: true, status: "active", date: "2025-05-18", praying: 9 },
-    { id: 302, title: "Business launch", categories: ["Work / Career"], note: "Launching the bakery in July.", isPublic: true, status: "active", date: "2025-04-30", praying: 15 },
-  ]},
-];
 
 const fmt = (d) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 const daysBetween = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
@@ -83,7 +69,8 @@ function CategoryPill({ cat }) {
   return <span style={{ background: c.bg, color: c.text, borderRadius: 20, padding: "2px 10px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>{cat}</span>;
 }
 
-function Avatar({ initials, size = 36 }) {
+function Avatar({ initials, photoURL, size = 36 }) {
+  if (photoURL) return <img src={photoURL} alt="avatar" style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />;
   return <div style={{ width: size, height: size, borderRadius: "50%", background: T.sageLight, display: "flex", alignItems: "center", justifyContent: "center", color: T.sageDark, fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: size * 0.38, flexShrink: 0 }}>{initials}</div>;
 }
 
@@ -95,15 +82,16 @@ function Badge({ label, color = T.sage }) {
   return <span style={{ background: color + "22", color, borderRadius: 20, padding: "2px 9px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>{label}</span>;
 }
 
-function Btn({ children, onClick, variant = "primary", style = {}, small = false }) {
-  const base = { border: "none", borderRadius: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 500, padding: small ? "7px 14px" : "11px 20px", fontSize: small ? 13 : 14, transition: "opacity 0.15s", display: "inline-flex", alignItems: "center", gap: 6 };
+function Btn({ children, onClick, variant = "primary", style = {}, small = false, disabled = false }) {
+  const base = { border: "none", borderRadius: 12, cursor: disabled ? "default" : "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 500, padding: small ? "7px 14px" : "11px 20px", fontSize: small ? 13 : 14, transition: "opacity 0.15s", display: "inline-flex", alignItems: "center", gap: 6, opacity: disabled ? 0.5 : 1 };
   const variants = {
     primary: { background: T.sageDark, color: T.white },
     secondary: { background: T.sageLight, color: T.sageDark },
     ghost: { background: "transparent", color: T.inkLight, border: `1px solid ${T.parchment}` },
     gold: { background: T.goldLight, color: T.gold },
+    danger: { background: T.dustyRoseLight, color: T.dustyRose },
   };
-  return <button style={{ ...base, ...variants[variant], ...style }} onClick={onClick}>{children}</button>;
+  return <button style={{ ...base, ...variants[variant], ...style }} onClick={disabled ? undefined : onClick}>{children}</button>;
 }
 
 function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToList, myPrayingIds, onTogglePraying, activePrayMode = false, covered = false, onToggleCovered, alreadyAdded = false }) {
@@ -189,18 +177,17 @@ function AddPrayerModal({ onClose, onAdd, editPrayer = null, friends = [], defau
   const [selectedCats, setSelectedCats] = useState(initialCats);
   const [customCat, setCustomCat] = useState("");
   const [isPublic, setIsPublic] = useState(editPrayer ? editPrayer.isPublic : defaultPublic);
-  const [sharedWith, setSharedWith] = useState([]);
+  const [prayerDate, setPrayerDate] = useState(editPrayer?.prayerDate || "");
   const cats = Object.keys(CAT_COLORS);
   const toggleCat = (c) => setSelectedCats(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
   const addCustomCat = () => {
     const t = customCat.trim();
     if (t && !selectedCats.includes(t)) { setSelectedCats(prev => [...prev, t]); setCustomCat(""); }
   };
-  const toggleFriend = (id) => setSharedWith(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const submit = () => {
     if (!title.trim()) return;
     const finalCats = selectedCats.length ? selectedCats : ["Other"];
-    onAdd({ title: title.trim(), note, categories: finalCats, isPublic, sharedWith });
+    onAdd({ title: title.trim(), note, categories: finalCats, isPublic, prayerDate });
   };
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "flex-end" }}>
@@ -210,6 +197,8 @@ function AddPrayerModal({ onClose, onAdd, editPrayer = null, friends = [], defau
         <input style={inputStyle} placeholder="A short title..." value={title} onChange={e => setTitle(e.target.value)} />
         <label style={labelStyle}>Notes (optional)</label>
         <textarea style={{ ...inputStyle, height: 80, resize: "none" }} placeholder="Add context, scripture, or details..." value={note} onChange={e => setNote(e.target.value)} />
+        <label style={labelStyle}>Date to pray by (optional)</label>
+        <input type="date" style={{ ...inputStyle }} value={prayerDate} onChange={e => setPrayerDate(e.target.value)} />
         <label style={labelStyle}>Categories (choose any)</label>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
           {cats.map(c => {
@@ -229,24 +218,12 @@ function AddPrayerModal({ onClose, onAdd, editPrayer = null, friends = [], defau
           <input style={{ ...inputStyle, marginBottom: 0, flex: 1 }} placeholder="Add a custom category..." value={customCat} onChange={e => setCustomCat(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addCustomCat(); }} />
           <Btn small variant="secondary" onClick={addCustomCat} style={{ flexShrink: 0 }}>Add</Btn>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: !isEdit && friends.length ? 12 : 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
           <div onClick={() => setIsPublic(!isPublic)} style={{ width: 44, height: 24, borderRadius: 12, background: isPublic ? T.sage : T.parchment, cursor: "pointer", position: "relative", flexShrink: 0 }}>
             <div style={{ position: "absolute", top: 3, left: isPublic ? 22 : 3, width: 18, height: 18, borderRadius: "50%", background: T.white, transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }} />
           </div>
           <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight }}>{isPublic ? "Public — friends can see & pray" : "Private — just for you"}</span>
         </div>
-        {!isEdit && friends.length > 0 && isPublic && (
-          <div style={{ marginBottom: 20 }}>
-            <label style={labelStyle}>Share directly with (optional)</label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {friends.map(f => (
-                <button key={f.id} onClick={() => toggleFriend(f.id)} style={{ display: "flex", alignItems: "center", gap: 6, border: `1.5px solid ${sharedWith.includes(f.id) ? T.sageDark : T.parchment}`, background: sharedWith.includes(f.id) ? T.sageLight : T.white, borderRadius: 20, padding: "5px 12px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", color: sharedWith.includes(f.id) ? T.sageDark : T.inkLight }}>
-                  <Avatar initials={f.avatar} size={18} />{f.name.split(" ")[0]}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
         <div style={{ display: "flex", gap: 10 }}>
           <Btn style={{ flex: 1 }} onClick={submit}>{isEdit ? "Save Changes" : "Add Prayer"}</Btn>
           <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
@@ -302,20 +279,17 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
   const heldForOthers = shown.filter(p => p.fromFriend);
   const coveredCount = coveredIds.filter(id => shown.find(p => p.id === id)).length;
 
-  const handleAdd = async ({ title, note, categories, isPublic }) => {
-    await addPrayer({ title, note, categories, isPublic });
+  const handleAdd = async ({ title, note, categories, isPublic, prayerDate }) => {
+    await addPrayer({ title, note, categories, isPublic, prayerDate });
     setShowAdd(false);
     showToast("Prayer added");
   };
-  const handleSave = async ({ title, note, categories, isPublic }) => {
-    await updatePrayer(editTarget.id, { title, note, categories, isPublic });
+  const handleSave = async ({ title, note, categories, isPublic, prayerDate }) => {
+    await updatePrayer(editTarget.id, { title, note, categories, isPublic, prayerDate });
     setEditTarget(null);
     showToast("Changes saved");
   };
-  const handleDelete = async (id) => {
-    await deletePrayer(id);
-    showToast("Prayer removed");
-  };
+  const handleDelete = async (id) => { await deletePrayer(id); showToast("Prayer removed"); };
   const handleAnswer = async (note) => {
     await updatePrayer(answerTarget.id, { status: "answered", answeredNote: note });
     setAnswerTarget(null);
@@ -379,8 +353,10 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
         </div>
       )}
       {shown.length === 0 && (
-        <div style={{ textAlign: "center", padding: "40px 20px", color: T.inkLight, fontFamily: "'DM Sans', sans-serif", fontSize: 14 }}>
-          {statusFilter === "active" ? "No active prayers yet. Add one above." : "No answered prayers yet. Keep praying!"}
+        <div style={{ textAlign: "center", padding: "40px 20px" }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>🕊️</div>
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: T.ink, marginBottom: 8 }}>{statusFilter === "active" ? "Your prayer list is empty" : "No answered prayers yet"}</div>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, lineHeight: 1.6 }}>{statusFilter === "active" ? "Tap + Add to bring your first prayer before God." : "Keep praying — answered prayers will appear here."}</div>
         </div>
       )}
       {mineOwn.map(renderCard)}
@@ -410,41 +386,38 @@ function Feed({ friends, myPrayers, addPrayer }) {
     if (adding) showToast("They'll know you're praying 🙏");
   };
   const addedKeys = myPrayers.filter(p => p.fromFriend).map(p => p.sourceKey);
-  const keyFor = (friend, p) => `${friend.id}-${p.id}`;
+  const keyFor = (friend, p) => `${friend.uid}-${p.id}`;
   const addToList = async (friend, prayer) => {
     const key = keyFor(friend, prayer);
     if (addedKeys.includes(key)) { showToast("Already on your list"); return; }
-    await addPrayer({
-      ...prayer,
-      sourceKey: key,
-      isPublic: false,
-      status: "active",
-      date: today(),
-      answeredNote: null,
-      praying: 0,
-      fromFriend: true,
-      ownerName: friend.name.split(" ")[0],
-    });
-    showToast(`Added ${friend.name.split(" ")[0]}'s prayer to your list`);
+    await addPrayer({ ...prayer, sourceKey: key, isPublic: false, status: "active", date: today(), answeredNote: null, praying: 0, fromFriend: true, ownerName: friend.displayName?.split(" ")[0] || "Friend" });
+    showToast(`Added to your list`);
   };
   const addAll = async (friend) => {
     const toAdd = friend.prayers.filter(p => p.status === "active" && !addedKeys.includes(keyFor(friend, p)));
     if (!toAdd.length) { showToast("All already on your list"); return; }
     for (const prayer of toAdd) {
-      await addPrayer({
-        ...prayer,
-        sourceKey: keyFor(friend, prayer),
-        isPublic: false,
-        status: "active",
-        date: today(),
-        answeredNote: null,
-        praying: 0,
-        fromFriend: true,
-        ownerName: friend.name.split(" ")[0],
-      });
+      await addPrayer({ ...prayer, sourceKey: keyFor(friend, prayer), isPublic: false, status: "active", date: today(), answeredNote: null, praying: 0, fromFriend: true, ownerName: friend.displayName?.split(" ")[0] || "Friend" });
     }
-    showToast(`Added ${toAdd.length} of ${friend.name.split(" ")[0]}'s prayers`);
+    showToast(`Added ${toAdd.length} prayers`);
   };
+
+  if (friends.length === 0) {
+    return (
+      <div style={tabContent}>
+        <div style={{ marginBottom: 20 }}>
+          <div style={pageTitle}>Friends' Prayers</div>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>Stand with your community</div>
+        </div>
+        <div style={{ textAlign: "center", padding: "40px 20px" }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>👥</div>
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: T.ink, marginBottom: 8 }}>No friends yet</div>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, lineHeight: 1.6 }}>Connect with friends in the Friends tab to see their prayer requests here.</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={tabContent}>
       <div style={{ marginBottom: 20 }}>
@@ -452,55 +425,132 @@ function Feed({ friends, myPrayers, addPrayer }) {
         <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>Stand with your community</div>
       </div>
       {friends.map(friend => (
-        <div key={friend.id} style={{ marginBottom: 24 }}>
+        <div key={friend.uid} style={{ marginBottom: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-            <Avatar initials={friend.avatar} />
+            <Avatar initials={(friend.displayName || "?").split(" ").map(n => n[0]).join("").slice(0, 2)} photoURL={friend.photoURL} />
             <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: T.ink }}>{friend.name}</div>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{friend.prayers.length} shared prayer{friend.prayers.length !== 1 ? "s" : ""}</div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: T.ink }}>{friend.displayName || "Friend"}</div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{friend.prayers?.length || 0} shared prayer{(friend.prayers?.length || 0) !== 1 ? "s" : ""}</div>
             </div>
-            <Btn small variant="ghost" onClick={() => addAll(friend)}>+ Add All</Btn>
+            {friend.prayers?.length > 0 && <Btn small variant="ghost" onClick={() => addAll(friend)}>+ Add All</Btn>}
           </div>
-          {friend.prayers.map(p => (
+          {(friend.prayers || []).map(p => (
             <PrayerCard key={p.id} prayer={p} mine={false} myPrayingIds={prayingIds} onTogglePraying={togglePraying} onAddToList={(pr) => addToList(friend, pr)} alreadyAdded={addedKeys.includes(keyFor(friend, p))} />
           ))}
+          {(!friend.prayers || friend.prayers.length === 0) && (
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, padding: "10px 0", fontStyle: "italic" }}>No public prayers shared yet.</div>
+          )}
         </div>
       ))}
     </div>
   );
 }
 
-function Friends({ friends }) {
+function Friends({ currentUser, friends, incomingRequests, onAccept, onDecline, onSendRequest }) {
+  const showToast = useToast();
   const [search, setSearch] = useState("");
-  const [requested, setRequested] = useState([]);
-  const SUGGESTIONS = [
-    { id: 10, name: "Marcus T.", avatar: "MT", mutual: 2 },
-    { id: 11, name: "Grace L.", avatar: "GL", mutual: 1 },
-  ];
+  const [searchResult, setSearchResult] = useState(null);
+  const [searching, setSearching] = useState(false);
+  const [requestSent, setRequestSent] = useState(false);
+
+  const handleSearch = async () => {
+    if (!search.trim()) return;
+    setSearching(true);
+    setSearchResult(null);
+    setRequestSent(false);
+    try {
+      const q = query(collection(db, "users"), where("email", "==", search.trim().toLowerCase()));
+      const snap = await getDocs(q);
+      if (snap.empty) {
+        setSearchResult({ notFound: true });
+      } else {
+        const userData = { uid: snap.docs[0].id, ...snap.docs[0].data() };
+        if (userData.uid === currentUser.uid) {
+          setSearchResult({ isSelf: true });
+        } else if (friends.find(f => f.uid === userData.uid)) {
+          setSearchResult({ alreadyFriend: true, user: userData });
+        } else {
+          setSearchResult({ user: userData });
+        }
+      }
+    } catch (e) {
+      setSearchResult({ error: true });
+    }
+    setSearching(false);
+  };
+
+  const handleSend = async () => {
+    if (!searchResult?.user) return;
+    await onSendRequest(searchResult.user);
+    setRequestSent(true);
+    showToast("Friend request sent 🙏");
+  };
+
   return (
     <div style={tabContent}>
       <div style={{ marginBottom: 20 }}><div style={pageTitle}>Friends</div></div>
-      <input style={{ ...inputStyle, marginBottom: 20 }} placeholder="Search by name or email..." value={search} onChange={e => setSearch(e.target.value)} />
-      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10 }}>Connected</div>
-      {friends.filter(f => f.name.toLowerCase().includes(search.toLowerCase())).map(f => (
-        <Card key={f.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Avatar initials={f.avatar} />
+
+      {/* Incoming requests */}
+      {incomingRequests.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.dustyRose, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10 }}>
+            {incomingRequests.length} Pending Request{incomingRequests.length !== 1 ? "s" : ""}
+          </div>
+          {incomingRequests.map(req => (
+            <Card key={req.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <Avatar initials={(req.fromName || "?").split(" ").map(n => n[0]).join("").slice(0, 2)} photoURL={req.fromPhoto} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: T.ink }}>{req.fromName || "Someone"}</div>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{req.fromEmail}</div>
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <Btn small variant="secondary" onClick={() => onAccept(req)}>Accept</Btn>
+                <Btn small variant="ghost" onClick={() => onDecline(req)}>Decline</Btn>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Search */}
+      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10 }}>Find a Friend</div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <input style={{ ...inputStyle, marginBottom: 0, flex: 1 }} placeholder="Search by email address..." value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleSearch(); }} />
+        <Btn small variant="secondary" onClick={handleSearch} disabled={searching} style={{ flexShrink: 0 }}>{searching ? "..." : "Search"}</Btn>
+      </div>
+
+      {searchResult && (
+        <Card style={{ marginBottom: 20 }}>
+          {searchResult.notFound && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight }}>No user found with that email.</div>}
+          {searchResult.isSelf && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight }}>That's you! 😄</div>}
+          {searchResult.alreadyFriend && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.sageDark }}>You're already friends with {searchResult.user.displayName}! 🙏</div>}
+          {searchResult.error && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.dustyRose }}>Something went wrong. Try again.</div>}
+          {searchResult.user && !searchResult.alreadyFriend && !searchResult.isSelf && (
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <Avatar initials={(searchResult.user.displayName || "?").split(" ").map(n => n[0]).join("").slice(0, 2)} photoURL={searchResult.user.photoURL} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: T.ink }}>{searchResult.user.displayName}</div>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{searchResult.user.email}</div>
+              </div>
+              <Btn small variant={requestSent ? "secondary" : "primary"} onClick={handleSend} disabled={requestSent}>{requestSent ? "Sent ✓" : "Connect"}</Btn>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Connected friends */}
+      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10 }}>Connected ({friends.length})</div>
+      {friends.length === 0 && (
+        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, padding: "16px 0", fontStyle: "italic" }}>No friends connected yet. Search by email to get started.</div>
+      )}
+      {friends.map(f => (
+        <Card key={f.uid} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Avatar initials={(f.displayName || "?").split(" ").map(n => n[0]).join("").slice(0, 2)} photoURL={f.photoURL} />
           <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: T.ink }}>{f.name}</div>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{f.prayers.filter(p => p.status === "active").length} active prayers</div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: T.ink }}>{f.displayName || "Friend"}</div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{f.email}</div>
           </div>
           <Badge label="Friend" color={T.sage} />
-        </Card>
-      ))}
-      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginTop: 20, marginBottom: 10 }}>Suggestions</div>
-      {SUGGESTIONS.map(s => (
-        <Card key={s.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Avatar initials={s.avatar} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: T.ink }}>{s.name}</div>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{s.mutual} mutual friend{s.mutual !== 1 ? "s" : ""}</div>
-          </div>
-          <Btn small variant={requested.includes(s.id) ? "secondary" : "ghost"} onClick={() => setRequested(prev => [...prev, s.id])}>{requested.includes(s.id) ? "Sent ✓" : "Connect"}</Btn>
         </Card>
       ))}
     </div>
@@ -585,10 +635,7 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
     <div style={tabContent}>
       <div style={{ marginBottom: 24 }}><div style={pageTitle}>Profile</div></div>
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 28 }}>
-        {user?.photoURL
-          ? <img src={user.photoURL} alt="avatar" style={{ width: 60, height: 60, borderRadius: "50%", objectFit: "cover" }} />
-          : <Avatar initials={(user?.displayName || "Me").split(" ").map(n => n[0]).join("").slice(0, 2)} size={60} />
-        }
+        <Avatar initials={(user?.displayName || "Me").split(" ").map(n => n[0]).join("").slice(0, 2)} photoURL={user?.photoURL} size={60} />
         <div>
           <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 600, color: T.ink }}>{user?.displayName || "My Account"}</div>
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>{user?.email || ""}</div>
@@ -660,12 +707,15 @@ const TABS = [
   { id: "profile", icon: "☽", label: "Profile" },
 ];
 
-function BottomNav({ active, setActive }) {
+function BottomNav({ active, setActive, requestCount }) {
   return (
     <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: T.white, borderTop: `1px solid ${T.parchment}`, display: "flex", zIndex: 100 }}>
       {TABS.map(t => (
-        <button key={t.id} onClick={() => setActive(t.id)} style={{ flex: 1, border: "none", background: "none", cursor: "pointer", padding: "10px 4px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+        <button key={t.id} onClick={() => setActive(t.id)} style={{ flex: 1, border: "none", background: "none", cursor: "pointer", padding: "10px 4px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, position: "relative" }}>
           <span style={{ fontSize: 20, lineHeight: 1 }}>{t.icon}</span>
+          {t.id === "friends" && requestCount > 0 && (
+            <div style={{ position: "absolute", top: 6, right: "50%", transform: "translateX(8px)", width: 16, height: 16, borderRadius: "50%", background: T.dustyRose, color: T.white, fontSize: 9, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{requestCount}</div>
+          )}
           <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: active === t.id ? T.sageDark : T.inkLight, fontWeight: active === t.id ? 500 : 400 }}>{t.label}</span>
           {active === t.id && <div style={{ width: 4, height: 4, borderRadius: "50%", background: T.sageDark }} />}
         </button>
@@ -678,17 +728,30 @@ export default function App() {
   const [user, setUser] = useState(undefined);
   const [tab, setTab] = useState("prayers");
   const [prayers, setPrayers] = useState([]);
-  const [friends] = useState(SEED_FRIENDS);
+  const [friends, setFriends] = useState([]);
+  const [incomingRequests, setIncomingRequests] = useState([]);
   const [defaultPublic, setDefaultPublic] = useState(true);
   const [loadingPrayers, setLoadingPrayers] = useState(true);
 
+  // Auth listener
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // Save/update user profile in Firestore
+        await setDoc(doc(db, "users", firebaseUser.uid), {
+          uid: firebaseUser.uid,
+          displayName: firebaseUser.displayName || "",
+          email: firebaseUser.email || "",
+          photoURL: firebaseUser.photoURL || "",
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+      }
       setUser(firebaseUser || null);
     });
     return unsub;
   }, []);
 
+  // Prayers listener
   useEffect(() => {
     if (!user) { setPrayers([]); setLoadingPrayers(false); return; }
     setLoadingPrayers(true);
@@ -697,6 +760,55 @@ export default function App() {
       const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       setPrayers(data);
       setLoadingPrayers(false);
+    });
+    return unsub;
+  }, [user]);
+
+  // Friends listener
+  useEffect(() => {
+    if (!user) { setFriends([]); return; }
+    const q = query(collection(db, "friendRequests"), where("status", "==", "accepted"), where("fromUid", "==", user.uid));
+    const q2 = query(collection(db, "friendRequests"), where("status", "==", "accepted"), where("toUid", "==", user.uid));
+
+    const loadFriendData = async (uids) => {
+      const profiles = await Promise.all(uids.map(async uid => {
+        const snap = await getDoc(doc(db, "users", uid));
+        if (!snap.exists()) return null;
+        const profile = { uid: snap.id, ...snap.data() };
+        // Load their public prayers
+        const prayerSnap = await getDocs(query(collection(db, "prayers"), where("userId", "==", uid), where("isPublic", "==", true)));
+        profile.prayers = prayerSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        return profile;
+      }));
+      return profiles.filter(Boolean);
+    };
+
+    const friendUids = new Set();
+    let fromData = [], toData = [];
+
+    const unsub1 = onSnapshot(q, async (snap) => {
+      fromData = snap.docs.map(d => d.data().toUid);
+      const allUids = [...new Set([...fromData, ...toData])];
+      const profiles = await loadFriendData(allUids);
+      setFriends(profiles);
+    });
+
+    const unsub2 = onSnapshot(q2, async (snap) => {
+      toData = snap.docs.map(d => d.data().fromUid);
+      const allUids = [...new Set([...fromData, ...toData])];
+      const profiles = await loadFriendData(allUids);
+      setFriends(profiles);
+    });
+
+    return () => { unsub1(); unsub2(); };
+  }, [user]);
+
+  // Incoming requests listener
+  useEffect(() => {
+    if (!user) { setIncomingRequests([]); return; }
+    const q = query(collection(db, "friendRequests"), where("toUid", "==", user.uid), where("status", "==", "pending"));
+    const unsub = onSnapshot(q, (snap) => {
+      setIncomingRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return unsub;
   }, [user]);
@@ -715,6 +827,7 @@ export default function App() {
       fromFriend: fields.fromFriend || false,
       ownerName: fields.ownerName || null,
       sourceKey: fields.sourceKey || null,
+      prayerDate: fields.prayerDate || null,
       createdAt: new Date().toISOString(),
     });
   };
@@ -727,9 +840,28 @@ export default function App() {
     await deleteDoc(doc(db, "prayers", id));
   };
 
-  const handleSignOut = async () => {
-    await signOut(auth);
+  const sendFriendRequest = async (toUser) => {
+    await addDoc(collection(db, "friendRequests"), {
+      fromUid: user.uid,
+      fromName: user.displayName || "",
+      fromEmail: user.email || "",
+      fromPhoto: user.photoURL || "",
+      toUid: toUser.uid,
+      toEmail: toUser.email || "",
+      status: "pending",
+      createdAt: new Date().toISOString(),
+    });
   };
+
+  const acceptRequest = async (req) => {
+    await updateDoc(doc(db, "friendRequests", req.id), { status: "accepted" });
+  };
+
+  const declineRequest = async (req) => {
+    await updateDoc(doc(db, "friendRequests", req.id), { status: "declined" });
+  };
+
+  const handleSignOut = async () => { await signOut(auth); };
 
   if (user === undefined) {
     return (
@@ -757,12 +889,12 @@ export default function App() {
             <>
               {tab === "prayers" && <MyPrayers prayers={prayers} addPrayer={addPrayer} updatePrayer={updatePrayer} deletePrayer={deletePrayer} friends={friends} firstName={firstName} defaultPublic={defaultPublic} />}
               {tab === "feed" && <Feed friends={friends} myPrayers={prayers} addPrayer={addPrayer} />}
-              {tab === "friends" && <Friends friends={friends} />}
+              {tab === "friends" && <Friends currentUser={user} friends={friends} incomingRequests={incomingRequests} onAccept={acceptRequest} onDecline={declineRequest} onSendRequest={sendFriendRequest} />}
               {tab === "dashboard" && <Dashboard prayers={prayers} />}
               {tab === "profile" && <Profile prayers={prayers} user={user} defaultPublic={defaultPublic} setDefaultPublic={setDefaultPublic} onSignOut={handleSignOut} />}
             </>
           )}
-          <BottomNav active={tab} setActive={setTab} />
+          <BottomNav active={tab} setActive={setTab} requestCount={incomingRequests.length} />
         </div>
       </ToastProvider>
     </>
