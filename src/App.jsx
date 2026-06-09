@@ -779,12 +779,16 @@ export default function App() {
     const q = query(collection(db, "friendRequests"), where("status", "==", "accepted"), where("fromUid", "==", user.uid));
     const q2 = query(collection(db, "friendRequests"), where("status", "==", "accepted"), where("toUid", "==", user.uid));
 
+// Friends listener
+  useEffect(() => {
+    if (!user) { setFriends([]); return; }
+
     const loadFriendData = async (uids) => {
+      if (!uids.length) return [];
       const profiles = await Promise.all(uids.map(async uid => {
         const snap = await getDoc(doc(db, "users", uid));
         if (!snap.exists()) return null;
         const profile = { uid: snap.id, ...snap.data() };
-        // Load their public prayers
         const prayerSnap = await getDocs(query(collection(db, "prayers"), where("userId", "==", uid), where("isPublic", "==", true)));
         profile.prayers = prayerSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         return profile;
@@ -792,24 +796,24 @@ export default function App() {
       return profiles.filter(Boolean);
     };
 
-    const friendUids = new Set();
-    let fromData = [], toData = [];
-
-    const unsub1 = onSnapshot(q, async (snap) => {
-      fromData = snap.docs.map(d => d.data().toUid);
-      const allUids = [...new Set([...fromData, ...toData])];
+    const refreshFriends = async () => {
+      const [snap1, snap2] = await Promise.all([
+        getDocs(query(collection(db, "friendRequests"), where("status", "==", "accepted"), where("fromUid", "==", user.uid))),
+        getDocs(query(collection(db, "friendRequests"), where("status", "==", "accepted"), where("toUid", "==", user.uid))),
+      ]);
+      const fromUids = snap1.docs.map(d => d.data().toUid);
+      const toUids = snap2.docs.map(d => d.data().fromUid);
+      const allUids = [...new Set([...fromUids, ...toUids])];
       const profiles = await loadFriendData(allUids);
       setFriends(profiles);
-    });
+    };
 
-    const unsub2 = onSnapshot(q2, async (snap) => {
-      toData = snap.docs.map(d => d.data().fromUid);
-      const allUids = [...new Set([...fromData, ...toData])];
-      const profiles = await loadFriendData(allUids);
-      setFriends(profiles);
-    });
+    refreshFriends();
 
-    return () => { unsub1(); unsub2(); };
+    // Re-run when friend requests change
+    const q = query(collection(db, "friendRequests"), where("status", "==", "accepted"));
+    const unsub = onSnapshot(q, () => refreshFriends());
+    return unsub;
   }, [user]);
 
   // Incoming requests listener
