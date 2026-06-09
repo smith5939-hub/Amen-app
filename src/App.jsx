@@ -377,13 +377,24 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
   );
 }
 
-function Feed({ friends, myPrayers, addPrayer }) {
+function Feed({ friends, myPrayers, addPrayer, currentUser }) {
   const showToast = useToast();
   const [prayingIds, setPrayingIds] = useState([]);
-  const togglePraying = (id) => {
+  const togglePraying = async (prayer, friend) => {
+    const id = prayer.id;
     const adding = !prayingIds.includes(id);
     setPrayingIds(prev => adding ? [...prev, id] : prev.filter(x => x !== id));
-    if (adding) showToast("They'll know you're praying 🙏");
+    if (adding) {
+      showToast("They'll know you're praying 🙏");
+      await addDoc(collection(db, "prayingRecords"), {
+        prayerOwnerId: prayer.userId,
+        prayerTitle: prayer.title,
+        prayingUserId: currentUser.uid,
+        prayerName: currentUser.displayName?.split(" ")[0] || "A friend",
+        prayerId: id,
+        createdAt: new Date().toISOString(),
+      });
+    }
   };
   const addedKeys = myPrayers.filter(p => p.fromFriend).map(p => p.sourceKey);
   const keyFor = (friend, p) => `${friend.uid}-${p.id}`;
@@ -435,7 +446,7 @@ function Feed({ friends, myPrayers, addPrayer }) {
             {friend.prayers?.length > 0 && <Btn small variant="ghost" onClick={() => addAll(friend)}>+ Add All</Btn>}
           </div>
           {(friend.prayers || []).map(p => (
-            <PrayerCard key={p.id} prayer={p} mine={false} myPrayingIds={prayingIds} onTogglePraying={togglePraying} onAddToList={(pr) => addToList(friend, pr)} alreadyAdded={addedKeys.includes(keyFor(friend, p))} />
+            <PrayerCard key={p.id} prayer={p} mine={false} myPrayingIds={prayingIds} onTogglePraying={(p) => togglePraying(p, friend)} onAddToList={(pr) => addToList(friend, pr)} alreadyAdded={addedKeys.includes(keyFor(friend, p))} />
           ))}
           {(!friend.prayers || friend.prayers.length === 0) && (
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, padding: "10px 0", fontStyle: "italic" }}>No public prayers shared yet.</div>
@@ -912,7 +923,7 @@ export default function App() {
           ) : (
             <>
               {tab === "prayers" && <MyPrayers prayers={prayers} addPrayer={addPrayer} updatePrayer={updatePrayer} deletePrayer={deletePrayer} friends={friends} firstName={firstName} defaultPublic={defaultPublic} />}
-              {tab === "feed" && <Feed friends={friends} myPrayers={prayers} addPrayer={addPrayer} />}
+              {tab === "feed" && <Feed friends={friends} myPrayers={prayers} addPrayer={addPrayer} currentUser={user} />}
               {tab === "friends" && <Friends currentUser={user} friends={friends} incomingRequests={incomingRequests} onAccept={acceptRequest} onDecline={declineRequest} onSendRequest={sendFriendRequest} />}
               {tab === "dashboard" && <Dashboard prayers={prayers} />}
               {tab === "profile" && <Profile prayers={prayers} user={user} defaultPublic={defaultPublic} setDefaultPublic={setDefaultPublic} onSignOut={handleSignOut} />}
