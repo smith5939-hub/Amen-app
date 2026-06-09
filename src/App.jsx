@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext } from "react";
-import { auth } from "./firebase";
+import { auth, db } from "./firebase";
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "firebase/auth";
+import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
 
 const FontLink = () => {
   useEffect(() => {
@@ -29,14 +30,6 @@ const CAT_COLORS = {
 };
 const catColor = (cat) => CAT_COLORS[cat] || { bg: T.mist, text: T.inkLight };
 const primaryCatColor = (cats) => catColor(Array.isArray(cats) ? cats[0] : cats).text;
-
-const SEED_PRAYERS = [
-  { id: 1, title: "Mom's surgery recovery", categories: ["Health"], note: "She goes in Tuesday. Praying for peace and a smooth procedure.", isPublic: true, status: "active", date: "2025-05-01", answeredNote: null, praying: 3, fromFriend: false, ownerName: null },
-  { id: 2, title: "Job interview at Northlight", categories: ["Work / Career"], note: "Final round on Friday. Been waiting for this one.", isPublic: true, status: "answered", date: "2025-04-18", answeredNote: "Got the offer! Starting June 3rd. God is so faithful.", praying: 7, fromFriend: false, ownerName: null },
-  { id: 3, title: "Peace in our marriage", categories: ["Relationships", "Family"], note: "We've been going through a rough patch. Asking for patience and grace for us both.", isPublic: false, status: "active", date: "2025-05-10", answeredNote: null, praying: 0, fromFriend: false, ownerName: null },
-  { id: 4, title: "Financial breakthrough", categories: ["Finances"], note: "Rent increase coming. Trusting God to provide.", isPublic: true, status: "active", date: "2025-05-15", answeredNote: null, praying: 2, fromFriend: false, ownerName: null },
-  { id: 5, title: "Grow closer to God", categories: ["Spiritual Growth"], note: "Start the year with intentional daily prayer.", isPublic: false, status: "active", date: "2025-01-01", answeredNote: null, praying: 0, fromFriend: false, ownerName: null },
-];
 
 const SEED_FRIENDS = [
   { id: 1, name: "Sarah M.", avatar: "SM", prayers: [
@@ -282,7 +275,7 @@ function AnswerModal({ prayer, onClose, onConfirm }) {
   );
 }
 
-function MyPrayers({ prayers, setPrayers, friends, firstName, defaultPublic }) {
+function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, firstName, defaultPublic }) {
   const showToast = useToast();
   const [showAdd, setShowAdd] = useState(false);
   const [answerTarget, setAnswerTarget] = useState(null);
@@ -308,26 +301,30 @@ function MyPrayers({ prayers, setPrayers, friends, firstName, defaultPublic }) {
   const mineOwn = shown.filter(p => !p.fromFriend);
   const heldForOthers = shown.filter(p => p.fromFriend);
   const coveredCount = coveredIds.filter(id => shown.find(p => p.id === id)).length;
-  const addPrayer = ({ title, note, categories, isPublic }) => {
-    setPrayers(prev => [{ id: Date.now(), title, note, categories, isPublic, status: "active", date: today(), answeredNote: null, praying: 0, fromFriend: false, ownerName: null }, ...prev]);
+
+  const handleAdd = async ({ title, note, categories, isPublic }) => {
+    await addPrayer({ title, note, categories, isPublic });
     setShowAdd(false);
     showToast("Prayer added");
   };
-  const savePrayer = ({ title, note, categories, isPublic }) => {
-    setPrayers(prev => prev.map(p => p.id === editTarget.id ? { ...p, title, note, categories, isPublic } : p));
+  const handleSave = async ({ title, note, categories, isPublic }) => {
+    await updatePrayer(editTarget.id, { title, note, categories, isPublic });
     setEditTarget(null);
     showToast("Changes saved");
   };
-  const deletePrayer = (id) => { setPrayers(prev => prev.filter(p => p.id !== id)); showToast("Prayer removed"); };
-  const markAnswered = (note) => {
-    setPrayers(prev => prev.map(p => p.id === answerTarget.id ? { ...p, status: "answered", answeredNote: note } : p));
+  const handleDelete = async (id) => {
+    await deletePrayer(id);
+    showToast("Prayer removed");
+  };
+  const handleAnswer = async (note) => {
+    await updatePrayer(answerTarget.id, { status: "answered", answeredNote: note });
     setAnswerTarget(null);
     showToast("Celebrating with you 🙌");
   };
   const toggleCovered = (id) => setCoveredIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const endSession = () => { setActivePrayMode(false); setCoveredIds([]); };
   const renderCard = (p) => (
-    <PrayerCard key={p.id} prayer={p} mine onAnswer={setAnswerTarget} onDelete={deletePrayer} onEdit={setEditTarget} activePrayMode={activePrayMode} covered={coveredIds.includes(p.id)} onToggleCovered={toggleCovered} />
+    <PrayerCard key={p.id} prayer={p} mine onAnswer={setAnswerTarget} onDelete={handleDelete} onEdit={setEditTarget} activePrayMode={activePrayMode} covered={coveredIds.includes(p.id)} onToggleCovered={toggleCovered} />
   );
   return (
     <div style={tabContent}>
@@ -397,14 +394,14 @@ function MyPrayers({ prayers, setPrayers, friends, firstName, defaultPublic }) {
           {heldForOthers.map(renderCard)}
         </>
       )}
-      {showAdd && <AddPrayerModal onClose={() => setShowAdd(false)} onAdd={addPrayer} friends={friends} defaultPublic={defaultPublic} />}
-      {editTarget && <AddPrayerModal onClose={() => setEditTarget(null)} onAdd={savePrayer} editPrayer={editTarget} friends={friends} defaultPublic={defaultPublic} />}
-      {answerTarget && <AnswerModal prayer={answerTarget} onClose={() => setAnswerTarget(null)} onConfirm={markAnswered} />}
+      {showAdd && <AddPrayerModal onClose={() => setShowAdd(false)} onAdd={handleAdd} friends={friends} defaultPublic={defaultPublic} />}
+      {editTarget && <AddPrayerModal onClose={() => setEditTarget(null)} onAdd={handleSave} editPrayer={editTarget} friends={friends} defaultPublic={defaultPublic} />}
+      {answerTarget && <AnswerModal prayer={answerTarget} onClose={() => setAnswerTarget(null)} onConfirm={handleAnswer} />}
     </div>
   );
 }
 
-function Feed({ friends, myPrayers, setMyPrayers }) {
+function Feed({ friends, myPrayers, addPrayer }) {
   const showToast = useToast();
   const [prayingIds, setPrayingIds] = useState([]);
   const togglePraying = (id) => {
@@ -414,27 +411,38 @@ function Feed({ friends, myPrayers, setMyPrayers }) {
   };
   const addedKeys = myPrayers.filter(p => p.fromFriend).map(p => p.sourceKey);
   const keyFor = (friend, p) => `${friend.id}-${p.id}`;
-  const addToList = (friend, prayer) => {
+  const addToList = async (friend, prayer) => {
     const key = keyFor(friend, prayer);
     if (addedKeys.includes(key)) { showToast("Already on your list"); return; }
-    setMyPrayers(prev => [{
-      ...prayer, id: Date.now() + Math.random(), sourceKey: key, isPublic: false,
-      status: "active", date: today(), answeredNote: null, praying: 0,
-      fromFriend: true, ownerName: friend.name.split(" ")[0],
-    }, ...prev]);
+    await addPrayer({
+      ...prayer,
+      sourceKey: key,
+      isPublic: false,
+      status: "active",
+      date: today(),
+      answeredNote: null,
+      praying: 0,
+      fromFriend: true,
+      ownerName: friend.name.split(" ")[0],
+    });
     showToast(`Added ${friend.name.split(" ")[0]}'s prayer to your list`);
   };
-  const addAll = (friend) => {
+  const addAll = async (friend) => {
     const toAdd = friend.prayers.filter(p => p.status === "active" && !addedKeys.includes(keyFor(friend, p)));
     if (!toAdd.length) { showToast("All already on your list"); return; }
-    setMyPrayers(prev => [
-      ...toAdd.map(prayer => ({
-        ...prayer, id: Date.now() + Math.random(), sourceKey: keyFor(friend, prayer),
-        isPublic: false, status: "active", date: today(), answeredNote: null, praying: 0,
-        fromFriend: true, ownerName: friend.name.split(" ")[0],
-      })),
-      ...prev,
-    ]);
+    for (const prayer of toAdd) {
+      await addPrayer({
+        ...prayer,
+        sourceKey: keyFor(friend, prayer),
+        isPublic: false,
+        status: "active",
+        date: today(),
+        answeredNote: null,
+        praying: 0,
+        fromFriend: true,
+        ownerName: friend.name.split(" ")[0],
+      });
+    }
     showToast(`Added ${toAdd.length} of ${friend.name.split(" ")[0]}'s prayers`);
   };
   return (
@@ -614,11 +622,9 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
   );
 }
 
-// ── Sign In ───────────────────────────────────────────────────────────────────
 function SignIn() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
   const handleGoogle = async () => {
     setLoading(true);
     setError(null);
@@ -630,7 +636,6 @@ function SignIn() {
       setLoading(false);
     }
   };
-
   return (
     <div style={{ minHeight: "100vh", background: T.cream, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32 }}>
       <div style={{ fontSize: 52, marginBottom: 16 }}>🕊️</div>
@@ -672,9 +677,10 @@ function BottomNav({ active, setActive }) {
 export default function App() {
   const [user, setUser] = useState(undefined);
   const [tab, setTab] = useState("prayers");
-  const [prayers, setPrayers] = useState(SEED_PRAYERS);
+  const [prayers, setPrayers] = useState([]);
   const [friends] = useState(SEED_FRIENDS);
   const [defaultPublic, setDefaultPublic] = useState(true);
+  const [loadingPrayers, setLoadingPrayers] = useState(true);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (firebaseUser) => {
@@ -683,11 +689,48 @@ export default function App() {
     return unsub;
   }, []);
 
+  useEffect(() => {
+    if (!user) { setPrayers([]); setLoadingPrayers(false); return; }
+    setLoadingPrayers(true);
+    const q = query(collection(db, "prayers"), where("userId", "==", user.uid));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setPrayers(data);
+      setLoadingPrayers(false);
+    });
+    return unsub;
+  }, [user]);
+
+  const addPrayer = async (fields) => {
+    await addDoc(collection(db, "prayers"), {
+      userId: user.uid,
+      title: fields.title || "",
+      note: fields.note || "",
+      categories: fields.categories || ["Other"],
+      isPublic: fields.isPublic ?? true,
+      status: fields.status || "active",
+      date: fields.date || today(),
+      answeredNote: fields.answeredNote || null,
+      praying: fields.praying || 0,
+      fromFriend: fields.fromFriend || false,
+      ownerName: fields.ownerName || null,
+      sourceKey: fields.sourceKey || null,
+      createdAt: new Date().toISOString(),
+    });
+  };
+
+  const updatePrayer = async (id, fields) => {
+    await updateDoc(doc(db, "prayers", id), fields);
+  };
+
+  const deletePrayer = async (id) => {
+    await deleteDoc(doc(db, "prayers", id));
+  };
+
   const handleSignOut = async () => {
     await signOut(auth);
   };
 
-  // Still loading auth state
   if (user === undefined) {
     return (
       <div style={{ minHeight: "100vh", background: T.cream, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -708,11 +751,17 @@ export default function App() {
           <div style={{ position: "sticky", top: 0, zIndex: 90, background: T.cream, textAlign: "center", padding: "14px 0 10px", borderBottom: `1px solid ${T.parchment}` }}>
             <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 600, color: T.sageDark, letterSpacing: 3 }}>LIFT</span>
           </div>
-          {tab === "prayers" && <MyPrayers prayers={prayers} setPrayers={setPrayers} friends={friends} firstName={firstName} defaultPublic={defaultPublic} />}
-          {tab === "feed" && <Feed friends={friends} myPrayers={prayers} setMyPrayers={setPrayers} />}
-          {tab === "friends" && <Friends friends={friends} />}
-          {tab === "dashboard" && <Dashboard prayers={prayers} />}
-          {tab === "profile" && <Profile prayers={prayers} user={user} defaultPublic={defaultPublic} setDefaultPublic={setDefaultPublic} onSignOut={handleSignOut} />}
+          {loadingPrayers ? (
+            <div style={{ textAlign: "center", padding: "60px 20px", fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight }}>Loading your prayers...</div>
+          ) : (
+            <>
+              {tab === "prayers" && <MyPrayers prayers={prayers} addPrayer={addPrayer} updatePrayer={updatePrayer} deletePrayer={deletePrayer} friends={friends} firstName={firstName} defaultPublic={defaultPublic} />}
+              {tab === "feed" && <Feed friends={friends} myPrayers={prayers} addPrayer={addPrayer} />}
+              {tab === "friends" && <Friends friends={friends} />}
+              {tab === "dashboard" && <Dashboard prayers={prayers} />}
+              {tab === "profile" && <Profile prayers={prayers} user={user} defaultPublic={defaultPublic} setDefaultPublic={setDefaultPublic} onSignOut={handleSignOut} />}
+            </>
+          )}
           <BottomNav active={tab} setActive={setTab} />
         </div>
       </ToastProvider>
