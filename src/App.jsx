@@ -2,7 +2,6 @@ import { useState, useEffect, createContext, useContext } from "react";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "firebase/auth";
 import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs } from "firebase/firestore";
-import { getMessaging, getToken, onMessage } from "firebase/messaging";
 
 const FontLink = () => {
   useEffect(() => {
@@ -757,25 +756,7 @@ export default function App() {
         await setDoc(doc(db, "userActivity", firebaseUser.uid), {
           lastActive: new Date().toISOString(),
         }, { merge: true });
-        // Request notification permission
-        try {
-          const { messaging, VAPID_KEY } = await import("./firebase");
-          await firebaseUser.getIdToken(true);
-          const permission = await Notification.requestPermission();
-          if (permission !== 'granted') throw new Error('Notification permission not granted');
-          const swReg = await navigator.serviceWorker.ready;
-          const token = await getToken(messaging, { 
-  vapidKey: VAPID_KEY,
-  serviceWorkerRegistration: swReg
-});
-          if (token) {
-            await setDoc(doc(db, "fcmTokens", token), {
-              userId: firebaseUser.uid,
-              token,
-              updatedAt: new Date().toISOString(),
-            });
-          }
-        } catch (e) {
+// TODO: Bucket 3 — push notifications via Cloud Function
           console.log("Notification permission denied or error:", e);
         }
       }
