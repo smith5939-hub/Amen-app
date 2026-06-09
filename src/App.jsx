@@ -391,7 +391,7 @@ function Feed({ friends, myPrayers, addPrayer }) {
     const key = keyFor(friend, prayer);
     if (addedKeys.includes(key)) { showToast("Already on your list"); return; }
     await addPrayer({ ...prayer, sourceKey: key, isPublic: false, status: "active", date: today(), answeredNote: null, praying: 0, fromFriend: true, ownerName: friend.displayName?.split(" ")[0] || "Friend" });
-    showToast(`Added to your list`);
+    showToast("Added to your list");
   };
   const addAll = async (friend) => {
     const toAdd = friend.prayers.filter(p => p.status === "active" && !addedKeys.includes(keyFor(friend, p)));
@@ -490,7 +490,6 @@ function Friends({ currentUser, friends, incomingRequests, onAccept, onDecline, 
     <div style={tabContent}>
       <div style={{ marginBottom: 20 }}><div style={pageTitle}>Friends</div></div>
 
-      {/* Incoming requests */}
       {incomingRequests.length > 0 && (
         <div style={{ marginBottom: 20 }}>
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.dustyRose, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10 }}>
@@ -512,7 +511,6 @@ function Friends({ currentUser, friends, incomingRequests, onAccept, onDecline, 
         </div>
       )}
 
-      {/* Search */}
       <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10 }}>Find a Friend</div>
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         <input style={{ ...inputStyle, marginBottom: 0, flex: 1 }} placeholder="Search by email address..." value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleSearch(); }} />
@@ -521,17 +519,17 @@ function Friends({ currentUser, friends, incomingRequests, onAccept, onDecline, 
 
       {searchResult && (
         <Card style={{ marginBottom: 20 }}>
-{searchResult.notFound && (
-  <div>
-    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, marginBottom: 12 }}>Not on LIFT yet.</div>
-    <Btn small variant="secondary" onClick={() => {
-      const subject = encodeURIComponent("Join me on LIFT");
-      const body = encodeURIComponent(`Hey! I've been using LIFT to track my prayers and I'd love to pray together. Join me here: https://amen-app-two.vercel.app`);
-      window.open(`mailto:${search}?subject=${subject}&body=${body}`);
-    }}>✉️ Send Invite</Btn>
-  </div>
-)}  
-{searchResult.isSelf && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight }}>That's you! 😄</div>}
+          {searchResult.notFound && (
+            <div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, marginBottom: 12 }}>Not on LIFT yet.</div>
+              <Btn small variant="secondary" onClick={() => {
+                const subject = encodeURIComponent("Join me on LIFT");
+                const body = encodeURIComponent(`Hey! I've been using LIFT to track my prayers and I'd love to pray together. Join me here: https://amen-app-two.vercel.app`);
+                window.open(`mailto:${search}?subject=${subject}&body=${body}`);
+              }}>✉️ Send Invite</Btn>
+            </div>
+          )}
+          {searchResult.isSelf && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight }}>That's you! 😄</div>}
           {searchResult.alreadyFriend && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.sageDark }}>You're already friends with {searchResult.user.displayName}! 🙏</div>}
           {searchResult.error && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.dustyRose }}>Something went wrong. Try again.</div>}
           {searchResult.user && !searchResult.alreadyFriend && !searchResult.isSelf && (
@@ -547,7 +545,6 @@ function Friends({ currentUser, friends, incomingRequests, onAccept, onDecline, 
         </Card>
       )}
 
-      {/* Connected friends */}
       <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10 }}>Connected ({friends.length})</div>
       {friends.length === 0 && (
         <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, padding: "16px 0", fontStyle: "italic" }}>No friends connected yet. Search by email to get started.</div>
@@ -742,11 +739,9 @@ export default function App() {
   const [defaultPublic, setDefaultPublic] = useState(true);
   const [loadingPrayers, setLoadingPrayers] = useState(true);
 
-  // Auth listener
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Save/update user profile in Firestore
         await setDoc(doc(db, "users", firebaseUser.uid), {
           uid: firebaseUser.uid,
           displayName: firebaseUser.displayName || "",
@@ -760,7 +755,6 @@ export default function App() {
     return unsub;
   }, []);
 
-  // Prayers listener
   useEffect(() => {
     if (!user) { setPrayers([]); setLoadingPrayers(false); return; }
     setLoadingPrayers(true);
@@ -773,13 +767,6 @@ export default function App() {
     return unsub;
   }, [user]);
 
-  // Friends listener
-  useEffect(() => {
-    if (!user) { setFriends([]); return; }
-    const q = query(collection(db, "friendRequests"), where("status", "==", "accepted"), where("fromUid", "==", user.uid));
-    const q2 = query(collection(db, "friendRequests"), where("status", "==", "accepted"), where("toUid", "==", user.uid));
-
-// Friends listener
   useEffect(() => {
     if (!user) { setFriends([]); return; }
 
@@ -809,14 +796,11 @@ export default function App() {
     };
 
     refreshFriends();
-
-    // Re-run when friend requests change
     const q = query(collection(db, "friendRequests"), where("status", "==", "accepted"));
     const unsub = onSnapshot(q, () => refreshFriends());
     return unsub;
   }, [user]);
 
-  // Incoming requests listener
   useEffect(() => {
     if (!user) { setIncomingRequests([]); return; }
     const q = query(collection(db, "friendRequests"), where("toUid", "==", user.uid), where("status", "==", "pending"));
@@ -874,7 +858,9 @@ export default function App() {
     await updateDoc(doc(db, "friendRequests", req.id), { status: "declined" });
   };
 
-  const handleSignOut = async () => { await signOut(auth); };
+  const handleSignOut = async () => {
+    await signOut(auth);
+  };
 
   if (user === undefined) {
     return (
@@ -912,5 +898,4 @@ export default function App() {
       </ToastProvider>
     </>
   );
-}
 }
