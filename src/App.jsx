@@ -521,8 +521,16 @@ function Friends({ currentUser, friends, incomingRequests, onAccept, onDecline, 
 
       {searchResult && (
         <Card style={{ marginBottom: 20 }}>
-          {searchResult.notFound && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight }}>No user found with that email.</div>}
-          {searchResult.isSelf && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight }}>That's you! 😄</div>}
+searchResult.notFound && (
+  <div>
+    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, marginBottom: 12 }}>Not on LIFT yet.</div>
+    <Btn small variant="secondary" onClick={() => {
+      const subject = encodeURIComponent("Join me on LIFT");
+      const body = encodeURIComponent(`Hey! I've been using LIFT to track my prayers and I'd love to pray together. Join me here: https://amen-app-two.vercel.app`);
+      window.open(`mailto:${search}?subject=${subject}&body=${body}`);
+    }}>✉️ Send Invite</Btn>
+  </div>
+)          {searchResult.isSelf && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight }}>That's you! 😄</div>}
           {searchResult.alreadyFriend && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.sageDark }}>You're already friends with {searchResult.user.displayName}! 🙏</div>}
           {searchResult.error && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.dustyRose }}>Something went wrong. Try again.</div>}
           {searchResult.user && !searchResult.alreadyFriend && !searchResult.isSelf && (
