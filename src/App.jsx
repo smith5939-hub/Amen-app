@@ -716,10 +716,244 @@ function SignIn() {
   );
 }
 
+function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequests, onAccept, onDecline, onSendRequest }) {
+  const showToast = useToast();
+  const [prayingIds, setPrayingIds] = useState([]);
+  const [friendsOpen, setFriendsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [searchResult, setSearchResult] = useState(null);
+  const [searching, setSearching] = useState(false);
+  const [requestSent, setRequestSent] = useState(false);
+
+  const togglePraying = async (prayer) => {
+    const id = prayer.id;
+    const adding = !prayingIds.includes(id);
+    setPrayingIds(prev => adding ? [...prev, id] : prev.filter(x => x !== id));
+    if (adding) {
+      showToast("They'll know you're praying 🙏");
+      await addDoc(collection(db, "prayingRecords"), {
+        prayerOwnerId: prayer.userId,
+        prayerTitle: prayer.title,
+        prayingUserId: currentUser.uid,
+        prayerName: currentUser.displayName?.split(" ")[0] || "A friend",
+        prayerId: id,
+        createdAt: new Date().toISOString(),
+      });
+    }
+  };
+
+  const addedKeys = myPrayers.filter(p => p.fromFriend).map(p => p.sourceKey);
+  const keyFor = (friend, p) => `${friend.uid}-${p.id}`;
+  const addToList = async (friend, prayer) => {
+    const key = keyFor(friend, prayer);
+    if (addedKeys.includes(key)) { showToast("Already on your list"); return; }
+    await addPrayer({ ...prayer, sourceKey: key, isPublic: false, status: "active", date: today(), answeredNote: null, praying: 0, fromFriend: true, ownerName: friend.displayName?.split(" ")[0] || "Friend" });
+    showToast("Added to your list");
+  };
+  const addAll = async (friend) => {
+    const toAdd = friend.prayers.filter(p => p.status === "active" && !addedKeys.includes(keyFor(friend, p)));
+    if (!toAdd.length) { showToast("All already on your list"); return; }
+    for (const prayer of toAdd) {
+      await addPrayer({ ...prayer, sourceKey: keyFor(friend, prayer), isPublic: false, status: "active", date: today(), answeredNote: null, praying: 0, fromFriend: true, ownerName: friend.displayName?.split(" ")[0] || "Friend" });
+    }
+    showToast(`Added ${toAdd.length} prayers`);
+  };
+
+  const handleSearch = async () => {
+    if (!search.trim()) return;
+    setSearching(true);
+    setSearchResult(null);
+    setRequestSent(false);
+    try {
+      const emailQ = query(collection(db, "users"), where("email", "==", search.trim().toLowerCase()));
+      const emailSnap = await getDocs(emailQ);
+      let userData = null;
+      if (!emailSnap.empty) {
+        userData = { uid: emailSnap.docs[0].id, ...emailSnap.docs[0].data() };
+      } else {
+        const nameQ = query(collection(db, "users"), where("displayName", "==", search.trim()));
+        const nameSnap = await getDocs(nameQ);
+        if (!nameSnap.empty) userData = { uid: nameSnap.docs[0].id, ...nameSnap.docs[0].data() };
+      }
+      if (!userData) { setSearchResult({ notFound: true }); }
+      else if (userData.uid === currentUser.uid) { setSearchResult({ isSelf: true }); }
+      else if (friends.find(f => f.uid === userData.uid)) { setSearchResult({ alreadyFriend: true, user: userData }); }
+      else { setSearchResult({ user: userData }); }
+    } catch (e) { setSearchResult({ error: true }); }
+    setSearching(false);
+  };
+
+  const handleSend = async () => {
+    if (!searchResult?.user) return;
+    await onSendRequest(searchResult.user);
+    setRequestSent(true);
+    showToast("Friend request sent 🙏");
+  };
+
+  return (
+    <div style={tabContent}>
+      <div style={{ marginBottom: 16 }}>
+        <div style={pageTitle}>Community</div>
+        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>Stand with your people</div>
+      </div>
+
+      {/* Collapsible Friends Section */}
+      <div style={{ background: T.white, borderRadius: 16, marginBottom: 16, boxShadow: "0 1px 6px rgba(0,0,0,0.05)", overflow: "hidden" }}>
+        <button onClick={() => setFriendsOpen(!friendsOpen)} style={{ width: "100%", border: "none", background: "none", padding: "14px 18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 16 }}>👥</span>
+            <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 14, color: T.ink }}>Friends ({friends.length})</span>
+            {incomingRequests.length > 0 && <span style={{ background: T.dustyRose, color: T.white, borderRadius: 20, padding: "1px 8px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 700 }}>{incomingRequests.length} pending</span>}
+          </div>
+          <span style={{ color: T.inkLight, fontSize: 14 }}>{friendsOpen ? "▲" : "▾"}</span>
+        </button>
+
+        {friendsOpen && (
+          <div style={{ padding: "0 18px 18px" }}>
+            {incomingRequests.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.dustyRose, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 8 }}>Pending Requests</div>
+                {incomingRequests.map(req => (
+                  <div key={req.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                    <Avatar initials={(req.fromName || "?").split(" ").map(n => n[0]).join("").slice(0, 2)} photoURL={req.fromPhoto} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 14, color: T.ink }}>{req.fromName || "Someone"}</div>
+                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{req.fromEmail}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <Btn small variant="secondary" onClick={() => onAccept(req)}>Accept</Btn>
+                      <Btn small variant="ghost" onClick={() => onDecline(req)}>Decline</Btn>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 8 }}>Add a Friend</div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+              <input style={{ ...inputStyle, marginBottom: 0, flex: 1 }} placeholder="Search by name or email..." value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleSearch(); }} />
+              <Btn small variant="secondary" onClick={handleSearch} disabled={searching} style={{ flexShrink: 0 }}>{searching ? "..." : "Search"}</Btn>
+            </div>
+
+            {searchResult && (
+              <div style={{ background: T.cream, borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
+                {searchResult.notFound && (
+                  <div>
+                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, marginBottom: 10 }}>Not on LIFT yet.</div>
+                    <Btn small variant="secondary" onClick={() => {
+                      const subject = encodeURIComponent("Join me on LIFT");
+                      const body = encodeURIComponent(`Hey! I've been using LIFT to track my prayers and I'd love to pray together. Join me here: https://amen-app-two.vercel.app`);
+                      window.open(`mailto:${search}?subject=${subject}&body=${body}`);
+                    }}>✉️ Send Invite</Btn>
+                  </div>
+                )}
+                {searchResult.isSelf && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight }}>That's you! 😄</div>}
+                {searchResult.alreadyFriend && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.sageDark }}>Already friends! 🙏</div>}
+                {searchResult.error && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.dustyRose }}>Something went wrong. Try again.</div>}
+                {searchResult.user && !searchResult.alreadyFriend && !searchResult.isSelf && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <Avatar initials={(searchResult.user.displayName || "?").split(" ").map(n => n[0]).join("").slice(0, 2)} photoURL={searchResult.user.photoURL} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: T.ink }}>{searchResult.user.displayName}</div>
+                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{searchResult.user.email}</div>
+                    </div>
+                    <Btn small variant={requestSent ? "secondary" : "primary"} onClick={handleSend} disabled={requestSent}>{requestSent ? "Sent ✓" : "Connect"}</Btn>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 8 }}>Connected</div>
+            {friends.length === 0 && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, fontStyle: "italic" }}>No friends yet. Search above to connect.</div>}
+            {friends.map(f => (
+              <div key={f.uid} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                <Avatar initials={(f.displayName || "?").split(" ").map(n => n[0]).join("").slice(0, 2)} photoURL={f.photoURL} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 14, color: T.ink }}>{f.displayName}</div>
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{f.email}</div>
+                </div>
+                <Badge label="Friend" color={T.sage} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Friends Prayer Feed */}
+      {friends.length === 0 && (
+        <div style={{ textAlign: "center", padding: "40px 20px" }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>🕊️</div>
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: T.ink, marginBottom: 8 }}>No friends yet</div>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, lineHeight: 1.6 }}>Connect with friends above to see their prayer requests here.</div>
+        </div>
+      )}
+      {friends.map(friend => (
+        <div key={friend.uid} style={{ marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+            <Avatar initials={(friend.displayName || "?").split(" ").map(n => n[0]).join("").slice(0, 2)} photoURL={friend.photoURL} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: T.ink }}>{friend.displayName || "Friend"}</div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{friend.prayers?.length || 0} shared prayer{(friend.prayers?.length || 0) !== 1 ? "s" : ""}</div>
+            </div>
+            {friend.prayers?.length > 0 && <Btn small variant="ghost" onClick={() => addAll(friend)}>+ Add All</Btn>}
+          </div>
+          {(friend.prayers || []).map(p => (
+            <PrayerCard key={p.id} prayer={p} mine={false} myPrayingIds={prayingIds} onTogglePraying={() => togglePraying(p)} onAddToList={(pr) => addToList(friend, pr)} alreadyAdded={addedKeys.includes(keyFor(friend, p))} />
+          ))}
+          {(!friend.prayers || friend.prayers.length === 0) && (
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, padding: "10px 0", fontStyle: "italic" }}>No public prayers shared yet.</div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Notifications({ currentUser }) {
+  const [notifs, setNotifs] = useState([]);
+  useEffect(() => {
+    if (!currentUser) return;
+    const q = query(collection(db, "notifications"), where("toUid", "==", currentUser.uid));
+    const unsub = onSnapshot(q, (snap) => {
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setNotifs(data);
+    });
+    return unsub;
+  }, [currentUser]);
+
+  return (
+    <div style={tabContent}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={pageTitle}>Notifications</div>
+        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>Your latest activity</div>
+      </div>
+      {notifs.length === 0 && (
+        <div style={{ textAlign: "center", padding: "40px 20px" }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>🔔</div>
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: T.ink, marginBottom: 8 }}>No notifications yet</div>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, lineHeight: 1.6 }}>When friends pray for you or send requests, you'll see them here.</div>
+        </div>
+      )}
+      {notifs.map(n => (
+        <Card key={n.id} style={{ borderLeft: `4px solid ${n.read ? T.parchment : T.sage}` }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+            <span style={{ fontSize: 24, flexShrink: 0 }}>{n.type === "prayed_for" ? "🙏" : n.type === "friend_request" ? "👥" : "💬"}</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 14, color: T.ink, marginBottom: 2 }}>{n.title}</div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, lineHeight: 1.5 }}>{n.body}</div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, marginTop: 6 }}>{n.createdAt ? fmt(n.createdAt) : ""}</div>
+            </div>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
 const TABS = [
   { id: "prayers", icon: "🙏", label: "Prayers" },
-  { id: "feed", icon: "🕊️", label: "Feed" },
-  { id: "friends", icon: "👥", label: "Friends" },
+  { id: "community", icon: "👥", label: "Community" },
+  { id: "notifications", icon: "🔔", label: "Notifications" },
   { id: "dashboard", icon: "✦", label: "Stats" },
   { id: "profile", icon: "☽", label: "Profile" },
 ];
@@ -730,7 +964,7 @@ function BottomNav({ active, setActive, requestCount }) {
       {TABS.map(t => (
         <button key={t.id} onClick={() => setActive(t.id)} style={{ flex: 1, border: "none", background: "none", cursor: "pointer", padding: "10px 4px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, position: "relative" }}>
           <span style={{ fontSize: 20, lineHeight: 1 }}>{t.icon}</span>
-          {t.id === "friends" && requestCount > 0 && (
+          {t.id === "notifications" && requestCount > 0 && (
             <div style={{ position: "absolute", top: 6, right: "50%", transform: "translateX(8px)", width: 16, height: 16, borderRadius: "50%", background: T.dustyRose, color: T.white, fontSize: 9, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{requestCount}</div>
           )}
           <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: active === t.id ? T.sageDark : T.inkLight, fontWeight: active === t.id ? 500 : 400 }}>{t.label}</span>
@@ -923,8 +1157,8 @@ export default function App() {
           ) : (
             <>
               {tab === "prayers" && <MyPrayers prayers={prayers} addPrayer={addPrayer} updatePrayer={updatePrayer} deletePrayer={deletePrayer} friends={friends} firstName={firstName} defaultPublic={defaultPublic} />}
-              {tab === "feed" && <Feed friends={friends} myPrayers={prayers} addPrayer={addPrayer} currentUser={user} />}
-              {tab === "friends" && <Friends currentUser={user} friends={friends} incomingRequests={incomingRequests} onAccept={acceptRequest} onDecline={declineRequest} onSendRequest={sendFriendRequest} />}
+              {tab === "community" && <Community currentUser={user} friends={friends} myPrayers={prayers} addPrayer={addPrayer} incomingRequests={incomingRequests} onAccept={acceptRequest} onDecline={declineRequest} onSendRequest={sendFriendRequest} />}
+              {tab === "notifications" && <Notifications currentUser={user} />}
               {tab === "dashboard" && <Dashboard prayers={prayers} />}
               {tab === "profile" && <Profile prayers={prayers} user={user} defaultPublic={defaultPublic} setDefaultPublic={setDefaultPublic} onSignOut={handleSignOut} />}
             </>
