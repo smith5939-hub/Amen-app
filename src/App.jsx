@@ -404,7 +404,7 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, lineHeight: 1.6 }}>{statusFilter === "active" ? "Tap + Add to bring your first prayer before God." : "Keep praying — answered prayers will appear here."}</div>
         </div>
       )}
-      {mineOwn.map(renderCard)}
+      {mineOwn.map(p => renderCard(p, true))}
       {heldForOthers.length > 0 && (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "20px 4px 14px" }}>
