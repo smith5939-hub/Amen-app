@@ -142,7 +142,7 @@ function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToLi
   return (
     <Card style={{ padding: "11px 14px", marginBottom: 8, borderLeft: `4px solid ${covered ? T.sageLight : accent}`, opacity: covered ? 0.55 : 1, transition: "opacity 0.3s, border-color 0.3s" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        {activePrayMode && mine && !isAnswered ? (
+        {activePrayMode && !isAnswered ? (
           <button onClick={handleCover} style={{ width: 26, height: 26, borderRadius: "50%", border: `1.5px solid ${covered ? T.sage : T.sageLight}`, background: covered ? T.sage : "transparent", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, transition: "all 0.2s", padding: 0 }}>
             <span style={{ color: covered ? T.white : T.sageLight, fontSize: 10 }}>🙏</span>
           </button>
@@ -374,7 +374,7 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
   const toggleCovered = (id) => setCoveredIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const endSession = () => { setActivePrayMode(false); setCoveredIds([]); };
   const renderCard = (p, isMine = true) => (
-    <PrayerCard key={p.id} prayer={p} mine={isMine} onAnswer={isMine ? setAnswerTarget : undefined} onDelete={isMine ? handleDelete : undefined} onEdit={isMine ? setEditTarget : undefined} activePrayMode={isMine && activePrayMode} covered={coveredIds.includes(p.id)} onToggleCovered={isMine ? toggleCovered : undefined} friends={friends} />
+    <PrayerCard key={p.id} prayer={p} mine={isMine} onAnswer={isMine ? setAnswerTarget : undefined} onDelete={isMine ? handleDelete : undefined} onEdit={isMine ? setEditTarget : undefined} activePrayMode={activePrayMode} covered={coveredIds.includes(p.id)} onToggleCovered={toggleCovered} friends={friends} />
   );
   return (
     <div style={tabContent}>
