@@ -1592,29 +1592,34 @@ function PrayerJournal({ prayers, onSaveJournal }) {
   const [text, setText] = useState("");
   const [linked, setLinked] = useState([]);
   const activePrayers = prayers.filter(p => p.status === "active" && !p.fromFriend).slice(0, 8);
-  const PROMPT_CHIPS = ["What am I feeling?", "What am I asking God for?", "What do I want to remember?"];
-  const [shownChips, setShownChips] = useState(PROMPT_CHIPS);
 
   const handleTextChange = (val) => {
     setText(val);
-    const lower = val.toLowerCase();
-    const remaining = PROMPT_CHIPS.filter(c => {
-      if (c.includes("feeling") && lower.includes("feel")) return false;
-      if (c.includes("asking") && lower.includes("ask")) return false;
-      if (c.includes("remember") && lower.includes("remember")) return false;
-      return true;
-    });
-    setShownChips(remaining);
   };
 
-  const toggleLinked = (id) => setLinked(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggleLinked = (prayer) => {
+    const alreadyLinked = linked.includes(prayer.id);
+
+    if (alreadyLinked) {
+      setLinked(prev => prev.filter(x => x !== prayer.id));
+      return;
+    }
+
+    setLinked(prev => [...prev, prayer.id]);
+    setText(prev => {
+      const prayerTitle = prayer.title.trim();
+      const spacer = prev.trim() ? "\n" : "";
+      return `${prev}${spacer}${prayerTitle}`;
+    });
+  };
 
   const save = async () => {
     if (!text.trim()) return;
     const linkedPrayers = prayers.filter(p => linked.includes(p.id)).map(p => ({ id: p.id, title: p.title }));
     await onSaveJournal({ text, type: "journal", title: text.slice(0, 50), linkedPrayers });
     showToast("Saved to journal 📓");
-    setText(""); setLinked([]); setShownChips(PROMPT_CHIPS);
+    setText("");
+    setLinked([]);
   };
 
   const addToPrayers = async () => {
@@ -1627,12 +1632,12 @@ function PrayerJournal({ prayers, onSaveJournal }) {
       {activePrayers.length > 0 && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: REFLECT_COLORS.journal.border, fontWeight: 500, marginBottom: 8 }}>From your prayers</div>
-          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, marginBottom: 8 }}>Pull in items from your prayer list as you write.</div>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, marginBottom: 8 }}>Tap a prayer to link it and add its title to your reflection.</div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {activePrayers.map(p => {
               const on = linked.includes(p.id);
               return (
-                <button key={p.id} onClick={() => toggleLinked(p.id)} style={{ border: `1.5px solid ${on ? REFLECT_COLORS.journal.border : T.parchment}`, background: on ? REFLECT_COLORS.journal.light : "transparent", borderRadius: 20, padding: "5px 12px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", color: on ? REFLECT_COLORS.journal.border : T.inkLight, display: "flex", alignItems: "center", gap: 6 }}>
+                <button key={p.id} onClick={() => toggleLinked(p)} style={{ border: `1.5px solid ${on ? REFLECT_COLORS.journal.border : T.parchment}`, background: on ? REFLECT_COLORS.journal.light : "transparent", borderRadius: 20, padding: "5px 12px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", color: on ? REFLECT_COLORS.journal.border : T.inkLight, display: "flex", alignItems: "center", gap: 6 }}>
                   {on && <span style={{ fontSize: 10 }}>✓</span>}{p.title.slice(0, 20)}{p.title.length > 20 ? "..." : ""}
                 </button>
               );
@@ -1640,26 +1645,23 @@ function PrayerJournal({ prayers, onSaveJournal }) {
           </div>
         </div>
       )}
-      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: REFLECT_COLORS.journal.border, fontWeight: 500, marginBottom: 4 }}>Today's reflection</div>
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 4 }}>
+        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: REFLECT_COLORS.journal.border, fontWeight: 500 }}>Today's reflection</div>
+        <Btn small style={{ padding: "7px 14px" }} onClick={save} disabled={!text.trim()}>Save to Journal</Btn>
+      </div>
+
       <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, marginBottom: 8 }}>Write freely. There's no right or wrong way to pray.</div>
       <textarea
         style={{ ...inputStyle, height: 180, resize: "none", fontFamily: "'Cormorant Garamond', serif", fontSize: 16, lineHeight: 1.8, marginBottom: 8 }}
         placeholder="Lord, I'm feeling..."
         value={text}
+        maxLength={2000}
         onChange={e => handleTextChange(e.target.value)}
       />
       <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, textAlign: "right", marginBottom: 10 }}>{text.length}/2000</div>
-      {shownChips.length > 0 && (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-          {shownChips.map(chip => (
-            <button key={chip} onClick={() => handleTextChange(text + (text ? " " : "") + chip.toLowerCase().replace("?", "") + ": ")} style={{ border: `1px solid ${T.parchment}`, background: "transparent", borderRadius: 20, padding: "5px 12px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", color: T.inkLight }}>
-              {chip}
-            </button>
-          ))}
-        </div>
-      )}
+
       <div style={{ display: "flex", gap: 10 }}>
-        <Btn style={{ flex: 1, justifyContent: "center" }} onClick={save} disabled={!text.trim()}>Save to Journal</Btn>
         <Btn variant="ghost" onClick={addToPrayers}>Add to Prayers</Btn>
       </div>
     </div>
@@ -1724,29 +1726,29 @@ function JournalEntryModal({ entry, onClose }) {
   const typeIcon = (type) => type === "guided" ? "🙏" : type === "composer" ? "✏️" : "📓";
   const fmtFull = (d) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "flex-end" }}>
-      <div style={{ background: T.cream, borderRadius: "20px 20px 0 0", padding: "24px 20px 40px", width: "100%", maxWidth: 480, margin: "0 auto", maxHeight: "85vh", overflowY: "auto" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 22 }}>{typeIcon(entry.type)}</span>
-            <div>
-              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 600, color: T.ink }}>{entry.title}</div>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{fmtFull(entry.createdAt)}</div>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
+      <div style={{ background: T.cream, borderRadius: 20, padding: "22px 20px 24px", width: "100%", maxWidth: 560, maxHeight: "calc(100vh - 80px)", overflowY: "auto", boxShadow: "0 12px 36px rgba(0,0,0,0.18)" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 10, minWidth: 0 }}>
+            <span style={{ fontSize: 22, flexShrink: 0 }}>{typeIcon(entry.type)}</span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 600, color: T.ink, lineHeight: 1.25, overflowWrap: "break-word" }}>{entry.title}</div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, marginTop: 2 }}>{fmtFull(entry.createdAt)}</div>
             </div>
           </div>
-          <button onClick={onClose} style={{ border: "none", background: "none", fontSize: 20, cursor: "pointer", color: T.inkLight, padding: 4 }}>✕</button>
+          <button onClick={onClose} style={{ border: "none", background: "none", fontSize: 20, cursor: "pointer", color: T.inkLight, padding: 4, flexShrink: 0 }}>✕</button>
         </div>
         {entry.linkedPrayers?.length > 0 && (
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: REFLECT_COLORS.journal.border, fontWeight: 500, marginBottom: 8 }}>Linked prayers</div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {entry.linkedPrayers.map(p => (
-                <span key={p.id} style={{ background: REFLECT_COLORS.journal.light, color: REFLECT_COLORS.journal.border, borderRadius: 20, padding: "3px 10px", fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}>{p.title}</span>
+                <span key={p.id} style={{ background: REFLECT_COLORS.journal.light, color: REFLECT_COLORS.journal.border, borderRadius: 20, padding: "3px 10px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", overflowWrap: "break-word" }}>{p.title}</span>
               ))}
             </div>
           </div>
         )}
-        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 17, color: T.ink, lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{entry.text}</div>
+        <div style={{ background: T.white, border: `1px solid ${T.parchment}`, borderRadius: 14, padding: "14px 16px", fontFamily: "'Cormorant Garamond', serif", fontSize: 17, color: T.ink, lineHeight: 1.8, whiteSpace: "pre-wrap", overflowWrap: "break-word" }}>{entry.text}</div>
       </div>
     </div>
   );
@@ -1795,11 +1797,11 @@ function Reflect({ prayers, user, addPrayer }) {
         <PrayerJournal prayers={prayers} onSaveJournal={saveJournal} />
       </ReflectCard>
 
-      <ReflectCard type="guided" title="Guided Prayer" subtitle="Coming soon — gentle prompts to shape what's on your heart." expanded={false} onToggle={() => {}} disabled={true}>
+      <ReflectCard type="guided" title="Guided Prayer" subtitle="Coming soon" expanded={false} onToggle={() => {}} disabled={true}>
         <GuidedPrayer onAddPrayer={addPrayer} />
       </ReflectCard>
 
-      <ReflectCard type="composer" title="Prayer Composer" subtitle="Coming soon — turn a burden into a personal prayer." expanded={false} onToggle={() => {}} disabled={true}>
+      <ReflectCard type="composer" title="Prayer Composer" subtitle="Coming soon" expanded={false} onToggle={() => {}} disabled={true}>
         <PrayerComposer prayers={prayers} onAddPrayer={addPrayer} onSaveJournal={saveJournal} />
       </ReflectCard>
 
