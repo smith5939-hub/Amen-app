@@ -141,3 +141,53 @@ exports.answeredPrayerNotification = onDocumentUpdated(
     }
   }
 );
+
+// ── Claude AI Proxy ───────────────────────────────────────────────────────────
+const { onCall } = require("firebase-functions/v2/https");
+const { defineSecret } = require("firebase-functions/params");
+const https = require("https");
+
+const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
+
+exports.claudeProxy = onCall(
+  { secrets: [ANTHROPIC_API_KEY] },
+  async (request) => {
+    if (!request.auth) throw new Error("Unauthenticated");
+    const { prompt } = request.data;
+    if (!prompt) throw new Error("No prompt provided");
+
+    const body = JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1000,
+      messages: [{ role: "user", content: prompt }]
+    });
+
+    return new Promise((resolve, reject) => {
+      const req = https.request({
+        hostname: "api.anthropic.com",
+        path: "/v1/messages",
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_API_KEY.value(),
+          "anthropic-version": "2023-06-01",
+          "Content-Length": Buffer.byteLength(body)
+        }
+      }, (res) => {
+        let data = "";
+        res.on("data", chunk => data += chunk);
+        res.on("end", () => {
+          try {
+            const parsed = JSON.parse(data);
+            resolve({ text: parsed.content?.[0]?.text || "" });
+          } catch (e) {
+            reject(new Error("Failed to parse response"));
+          }
+        });
+      });
+      req.on("error", reject);
+      req.write(body);
+      req.end();
+    });
+  }
+);

@@ -1,7 +1,14 @@
 import { useState, useEffect, createContext, useContext } from "react";
-import { auth, db } from "./firebase";
+import { auth, db, functions } from "./firebase";
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "firebase/auth";
 import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs } from "firebase/firestore";
+
+const callClaude = async (prompt) => {
+  const { functions } = await import("./firebase");
+  const proxy = httpsCallable(functions, "claudeProxy");
+  const result = await proxy({ prompt });
+  return result.data.text;
+};
 
 const FontLink = () => {
   useEffect(() => {
@@ -1087,17 +1094,7 @@ What they are asking God for: ${asking || "guidance and peace"}
 
 Write only the prayer itself, nothing else.`;
 
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{ role: "user", content: prompt }]
-        })
-      });
-      const data = await response.json();
-      const text = data.content?.[0]?.text || "";
+      const text = await callClaude(prompt);
       setGenerated(text);
       setEdited(text);
     } catch (e) {
@@ -1181,17 +1178,7 @@ ${prayerContext ? `Existing prayer context — Title: ${prayerContext.title}${pr
 
 Write only the prayer itself.`;
 
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{ role: "user", content: prompt }]
-        })
-      });
-      const data = await response.json();
-      const text = data.content?.[0]?.text || "";
+      const text = await callClaude(prompt);
       setComposed(text);
       setEdited(text);
     } catch (e) { console.error(e); }
@@ -1341,17 +1328,7 @@ function ScriptureThemes({ prayers }) {
 Return ONLY a JSON array with exactly 2 objects, no markdown, no explanation:
 [{"verse": "the verse text", "reference": "Book Chapter:Verse", "translation": "NIV"}, {"verse": "...", "reference": "...", "translation": "NIV"}]`;
 
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{ role: "user", content: prompt }]
-        })
-      });
-      const data = await response.json();
-      const text = data.content?.[0]?.text || "[]";
+      const text = await callClaude(prompt);
       const clean = text.replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(clean);
       setVerses(parsed);
