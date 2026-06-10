@@ -1035,9 +1035,9 @@ function Notifications({ currentUser }) {
   const [notifs, setNotifs] = useState([]);
   useEffect(() => {
     if (!currentUser) return;
-    const q = query(collection(db, "notifications"), where("toUid", "==", currentUser.uid), where("dismissed", "!=", true));
+    const q = query(collection(db, "notifications"), where("toUid", "==", currentUser.uid));
     const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(n => !n.dismissed).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       setNotifs(data);
     });
     return unsub;
