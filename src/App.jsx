@@ -1572,9 +1572,42 @@ Return ONLY a JSON array with exactly 2 objects, no markdown, no explanation:
   );
 }
 
+function JournalEntryModal({ entry, onClose }) {
+  const typeIcon = (type) => type === "guided" ? "🙏" : type === "composer" ? "✏️" : "📓";
+  const fmtFull = (d) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "flex-end" }}>
+      <div style={{ background: T.cream, borderRadius: "20px 20px 0 0", padding: "24px 20px 40px", width: "100%", maxWidth: 480, margin: "0 auto", maxHeight: "85vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 22 }}>{typeIcon(entry.type)}</span>
+            <div>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 600, color: T.ink }}>{entry.title}</div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{fmtFull(entry.createdAt)}</div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ border: "none", background: "none", fontSize: 20, cursor: "pointer", color: T.inkLight, padding: 4 }}>✕</button>
+        </div>
+        {entry.linkedPrayers?.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: REFLECT_COLORS.journal.border, fontWeight: 500, marginBottom: 8 }}>Linked prayers</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {entry.linkedPrayers.map(p => (
+                <span key={p.id} style={{ background: REFLECT_COLORS.journal.light, color: REFLECT_COLORS.journal.border, borderRadius: 20, padding: "3px 10px", fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}>{p.title}</span>
+              ))}
+            </div>
+          </div>
+        )}
+        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 17, color: T.ink, lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{entry.text}</div>
+      </div>
+    </div>
+  );
+}
+
 function Reflect({ prayers, user, addPrayer }) {
   const [expanded, setExpanded] = useState(null);
   const [journalEntries, setJournalEntries] = useState([]);
+  const [viewEntry, setViewEntry] = useState(null);
 
   const toggle = (id) => setExpanded(prev => prev === id ? null : id);
 
@@ -1624,6 +1657,7 @@ function Reflect({ prayers, user, addPrayer }) {
 
 
 
+      {viewEntry && <JournalEntryModal entry={viewEntry} onClose={() => setViewEntry(null)} />}
       {journalEntries.length > 0 && (
         <div style={{ marginTop: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -1631,7 +1665,7 @@ function Reflect({ prayers, user, addPrayer }) {
             <button style={{ border: "none", background: "none", fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: REFLECT_COLORS.guided.border, cursor: "pointer", fontWeight: 500 }}>See all ›</button>
           </div>
           {journalEntries.slice(0, 5).map(e => (
-            <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: `1px solid ${T.parchment}` }}>
+            <div key={e.id} onClick={() => setViewEntry(e)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: `1px solid ${T.parchment}`, cursor: "pointer" }}>
               <span style={{ fontSize: 18, flexShrink: 0 }}>{typeIcon(e.type)}</span>
               <div style={{ flex: 1 }}>
                 <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.ink, fontWeight: 500 }}>{e.title}</div>
