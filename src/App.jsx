@@ -346,8 +346,8 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
   };
   const toggleCovered = (id) => setCoveredIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const endSession = () => { setActivePrayMode(false); setCoveredIds([]); };
-  const renderCard = (p) => (
-    <PrayerCard key={p.id} prayer={p} mine onAnswer={setAnswerTarget} onDelete={handleDelete} onEdit={setEditTarget} activePrayMode={activePrayMode} covered={coveredIds.includes(p.id)} onToggleCovered={toggleCovered} friends={friends} />
+  const renderCard = (p, isMine = true) => (
+    <PrayerCard key={p.id} prayer={p} mine={isMine} onAnswer={isMine ? setAnswerTarget : undefined} onDelete={isMine ? handleDelete : undefined} onEdit={isMine ? setEditTarget : undefined} activePrayMode={isMine && activePrayMode} covered={coveredIds.includes(p.id)} onToggleCovered={isMine ? toggleCovered : undefined} friends={friends} />
   );
   return (
     <div style={tabContent}>
@@ -412,7 +412,7 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
             <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase" }}>Holding for Others</span>
             <div style={{ flex: 1, height: 1, background: T.parchment }} />
           </div>
-          {heldForOthers.map(renderCard)}
+          {heldForOthers.map(p => renderCard(p, false))}
         </>
       )}
       {showAdd && <AddPrayerModal onClose={() => setShowAdd(false)} onAdd={handleAdd} friends={friends} defaultPublic={defaultPublic} />}
@@ -1932,7 +1932,7 @@ export default function App() {
         if (!snap.exists()) return null;
         const profile = { uid: snap.id, ...snap.data() };
         const prayerSnap = await getDocs(query(collection(db, "prayers"), where("userId", "==", uid), where("isPublic", "==", true)));
-        profile.prayers = prayerSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        profile.prayers = prayerSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p.status === "active");
         return profile;
       }));
       return profiles.filter(Boolean);
