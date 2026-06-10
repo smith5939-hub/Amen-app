@@ -1035,13 +1035,18 @@ function Notifications({ currentUser }) {
   const [notifs, setNotifs] = useState([]);
   useEffect(() => {
     if (!currentUser) return;
-    const q = query(collection(db, "notifications"), where("toUid", "==", currentUser.uid));
+    const q = query(collection(db, "notifications"), where("toUid", "==", currentUser.uid), where("dismissed", "!=", true));
     const unsub = onSnapshot(q, (snap) => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       setNotifs(data);
     });
     return unsub;
   }, [currentUser]);
+
+  const dismissNotif = async (id) => {
+    await updateDoc(doc(db, "notifications", id), { read: true, dismissed: true });
+    setNotifs(prev => prev.filter(n => n.id !== id));
+  };
 
   return (
     <div style={tabContent}>
@@ -1057,13 +1062,14 @@ function Notifications({ currentUser }) {
         </div>
       )}
       {notifs.map(n => (
-        <Card key={n.id} style={{ borderLeft: `4px solid ${n.read ? T.parchment : T.sage}` }}>
+        <Card key={n.id} style={{ borderLeft: `4px solid ${n.read ? T.parchment : T.sage}`, position: "relative" }}>
           <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 14, color: T.ink, marginBottom: 2 }}>{n.title}</div>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, lineHeight: 1.5 }}>{n.body}</div>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, marginTop: 6 }}>{n.createdAt ? fmt(n.createdAt) : ""}</div>
             </div>
+            <button onClick={() => dismissNotif(n.id)} style={{ border: "none", background: "none", cursor: "pointer", color: T.inkLight, fontSize: 16, padding: "0 4px", flexShrink: 0, lineHeight: 1 }}>✕</button>
           </div>
         </Card>
       ))}
