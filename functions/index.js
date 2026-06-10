@@ -1,6 +1,6 @@
 const { setGlobalOptions } = require("firebase-functions");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
 const webpush = require("web-push");
@@ -90,3 +90,41 @@ exports.prayedForNotification = onDocumentCreated("prayingRecords/{recordId}", a
   const { prayerOwnerId, prayerTitle, prayerName } = record;
   await sendPushToUser(prayerOwnerId, "🙏 Someone is praying for you", `${prayerName || "A friend"} is praying for "${prayerTitle}"`, "prayed_for");
 });
+
+// ── 5. Answered prayer notification ──────────────────────────────────────────
+exports.answeredPrayerNotification = onDocumentUpdated(
+  "prayers/{prayerId}",
+  async (event) => {
+    const before = event.data.before.data();
+    const after = event.data.after.data();
+    if (before.status === after.status) return;
+    if (after.status !== "answered") return;
+    const prayerId = event.params.prayerId;
+    const prayer = after;
+    // Find all prayingRecords for this prayer
+    const prayingSnap = await db.collection("prayingRecords")
+      .where("prayerId", "==", prayerId)
+      .get();
+    // Get prayer owner name
+    const ownerSnap = await db.collection("users").doc(prayer.userId).get();
+    const ownerName = ownerSnap.exists ? (ownerSnap.data().displayName || "Someone") : "Someone";
+    // Notify everyone who prayed for it
+    for (const record of prayingSnap.docs) {
+      const { prayingUserId } = record.data();
+      if (prayingUserId === prayer.userId) continue;
+      await sendPushToUser(
+        prayingUserId,
+        "🙌 Prayer answered!",
+        `${ownerName}'s prayer was answered: "${prayer.title}"`,
+        "answered"
+      );
+    }
+    // Remove prayer from friends' lists (prayers added via sourceKey)
+    const friendPrayersSnap = await db.collection("prayers")
+      .where("sourceKey", "==", `${prayer.userId}-${prayerId}`)
+      .get();
+    for (const friendPrayer of friendPrayersSnap.docs) {
+      await friendPrayer.ref.delete();
+    }
+  }
+);
