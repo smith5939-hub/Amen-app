@@ -191,6 +191,32 @@ function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToLi
   );
 }
 
+function CelebrationScreen({ prayer, onComplete }) {
+  useEffect(() => {
+    const timer = setTimeout(onComplete, 2800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: T.cream, zIndex: 2000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 40, animation: "fadeIn 0.4s ease" }}>
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-18px); } 100% { transform: translateY(0px); } }
+        @keyframes fadeOut { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
+        .celebrate-wrap { animation: fadeOut 2.8s ease forwards; }
+        .bird-float { animation: float 2s ease-in-out infinite; }
+      `}</style>
+      <div className="celebrate-wrap" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
+        <div className="bird-float" style={{ fontSize: 72 }}>🕊️</div>
+        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 600, color: T.sageDark, textAlign: "center", lineHeight: 1.2 }}>Prayer Answered!</div>
+        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: T.ink, textAlign: "center", fontStyle: "italic", maxWidth: 300, lineHeight: 1.5 }}>"{prayer?.title}"</div>
+        <div style={{ fontSize: 32, marginTop: 8 }}>🙌</div>
+        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, textAlign: "center", marginTop: 4 }}>This has been added to your Testimonies.</div>
+      </div>
+    </div>
+  );
+}
+
 function AddPrayerModal({ onClose, onAdd, editPrayer = null, friends = [], defaultPublic = true }) {
   const isEdit = !!editPrayer;
   const initialCats = editPrayer ? (Array.isArray(editPrayer.categories) ? editPrayer.categories : [editPrayer.categories]) : ["Family"];
@@ -285,6 +311,7 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
   const [showFilters, setShowFilters] = useState(false);
   const [activePrayMode, setActivePrayMode] = useState(false);
   const [coveredIds, setCoveredIds] = useState([]);
+  const [celebrationPrayer, setCelebrationPrayer] = useState(null);
   const catsOf = (p) => Array.isArray(p.categories) ? p.categories : [p.categories].filter(Boolean);
   const active = prayers.filter(p => p.status === "active");
   const answered = prayers.filter(p => p.status === "answered");
@@ -313,9 +340,10 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
   };
   const handleDelete = async (id) => { await deletePrayer(id); showToast("Prayer removed"); };
   const handleAnswer = async (note) => {
-    await updatePrayer(answerTarget.id, { status: "answered", answeredNote: note });
+    const prayer = answerTarget;
+    await updatePrayer(prayer.id, { status: "answered", answeredNote: note });
     setAnswerTarget(null);
-    showToast("Celebrating with you 🙌");
+    setCelebrationPrayer(prayer);
   };
   const toggleCovered = (id) => setCoveredIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const endSession = () => { setActivePrayMode(false); setCoveredIds([]); };
@@ -345,11 +373,7 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
         </button>
       )}
       <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center" }}>
-        {["active", "answered"].map(f => (
-          <button key={f} onClick={() => setStatusFilter(f)} style={{ border: "none", borderRadius: 20, padding: "6px 14px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", background: statusFilter === f ? T.sageDark : T.parchment, color: statusFilter === f ? T.white : T.inkLight }}>
-            {f === "active" ? `Active (${active.length})` : `Answered (${answered.length})`}
-          </button>
-        ))}
+        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>{active.length} active prayer{active.length !== 1 ? "s" : ""}</div>
         <button onClick={() => setShowFilters(!showFilters)} style={{ marginLeft: "auto", border: `1px solid ${showFilters ? T.sageDark : T.parchment}`, borderRadius: 20, padding: "6px 12px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", background: showFilters ? T.sageLight : "transparent", color: showFilters ? T.sageDark : T.inkLight }}>⊞ Filter</button>
       </div>
       {showFilters && (
@@ -395,6 +419,7 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
       {showAdd && <AddPrayerModal onClose={() => setShowAdd(false)} onAdd={handleAdd} friends={friends} defaultPublic={defaultPublic} />}
       {editTarget && <AddPrayerModal onClose={() => setEditTarget(null)} onAdd={handleSave} editPrayer={editTarget} friends={friends} defaultPublic={defaultPublic} />}
       {answerTarget && <AnswerModal prayer={answerTarget} onClose={() => setAnswerTarget(null)} onConfirm={handleAnswer} />}
+      {celebrationPrayer && <CelebrationScreen prayer={celebrationPrayer} onComplete={() => setCelebrationPrayer(null)} />}
     </div>
   );
 }
@@ -678,6 +703,9 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
   const [reminderTimes, setReminderTimes] = useState(["morning"]);
   const [notifyPrayed, setNotifyPrayed] = useState(true);
   const [notifyEncourage, setNotifyEncourage] = useState(true);
+  const [stats, setStats] = useState({ daysPrayed: 0, streak: 0, totalPrayers: 0, answered: 0, prayedFor: 0, prayedByOthers: 0, encourageSent: 0, encourageReceived: 0, journalEntries: 0 });
+  const [testimonies, setTestimonies] = useState([]);
+  const [showTestimonies, setShowTestimonies] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -692,6 +720,48 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
       }
     });
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const loadStats = async () => {
+      // Daily activity for days prayed + streak
+      const actSnap = await getDocs(query(collection(db, "dailyActivity"), where("userId", "==", user.uid)));
+      const dates = actSnap.docs.map(d => d.data().date).sort().reverse();
+      const daysPrayed = dates.length;
+      let streak = 0;
+      const today = new Date().toISOString().split("T")[0];
+      let check = today;
+      for (const date of dates) {
+        if (date === check) { streak++; const d = new Date(check); d.setDate(d.getDate() - 1); check = d.toISOString().split("T")[0]; }
+        else break;
+      }
+      // Prayers prayed for others
+      const prayedForSnap = await getDocs(query(collection(db, "prayingRecords"), where("prayingUserId", "==", user.uid)));
+      const uniquePrayedFor = new Set(prayedForSnap.docs.map(d => d.data().prayerOwnerId)).size;
+      // People who prayed for me
+      const prayedBySnap = await getDocs(query(collection(db, "prayingRecords"), where("prayerOwnerId", "==", user.uid)));
+      const uniquePrayedBy = new Set(prayedBySnap.docs.map(d => d.data().prayingUserId)).size;
+      // Encouragement sent
+      const encourageSent = prayedForSnap.docs.filter(d => d.data().note).length;
+      // Encouragement received
+      const encourageSnap = await getDocs(query(collection(db, "notifications"), where("toUid", "==", user.uid), where("type", "==", "encouragement")));
+      // Journal entries
+      const journalSnap = await getDocs(query(collection(db, "journalEntries"), where("userId", "==", user.uid)));
+      setStats({
+        daysPrayed,
+        streak,
+        totalPrayers: prayers.filter(p => !p.fromFriend).length,
+        answered: prayers.filter(p => p.status === "answered").length,
+        prayedFor: uniquePrayedFor,
+        prayedByOthers: uniquePrayedBy,
+        encourageSent,
+        encourageReceived: encourageSnap.docs.length,
+        journalEntries: journalSnap.docs.length,
+      });
+      setTestimonies(prayers.filter(p => p.status === "answered").sort((a, b) => new Date(b.date) - new Date(a.date)));
+    };
+    loadStats();
+  }, [user, prayers]);
 
   const saveSettings = async (updates) => {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -769,18 +839,52 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
           <Toggle val={val} onToggle={onToggle} />
         </Card>
       ))}
-      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginTop: 20, marginBottom: 10 }}>Stats</div>
-      <Card>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          {[{ label: "Total Prayers", val: prayers.length }, { label: "Answered", val: prayers.filter(p => p.status === "answered").length }, { label: "Day Streak", val: "14 days" }, { label: "Friends", val: 3 }].map(({ label, val }) => (
-            <div key={label}>
-              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 24, fontWeight: 600, color: T.sageDark }}>{val}</div>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{label}</div>
-            </div>
+      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginTop: 20, marginBottom: 10 }}>Your Prayer Life</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+        {[
+          { label: "Days Prayed", val: stats.daysPrayed },
+          { label: "Current Streak", val: `${stats.streak}d` },
+          { label: "Prayers Added", val: stats.totalPrayers },
+          { label: "People Prayed For", val: stats.prayedFor },
+          { label: "Prayed For You", val: stats.prayedByOthers },
+          { label: "Encouragements Sent", val: stats.encourageSent },
+          { label: "Encouragements Received", val: stats.encourageReceived },
+          { label: "Journal Entries", val: stats.journalEntries },
+        ].map(({ label, val }) => (
+          <Card key={label} style={{ padding: "14px 14px", marginBottom: 0 }}>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 28, fontWeight: 600, color: T.sageDark }}>{val}</div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, marginTop: 2 }}>{label}</div>
+          </Card>
+        ))}
+      </div>
+
+      <button onClick={() => setShowTestimonies(!showTestimonies)} style={{ width: "100%", border: "none", background: T.answeredBg, borderRadius: 14, padding: "14px 18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 20 }}>🙌</span>
+          <div style={{ textAlign: "left" }}>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 14, color: T.sageDark }}>Testimonies</div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{stats.answered} answered prayer{stats.answered !== 1 ? "s" : ""}</div>
+          </div>
+        </div>
+        <span style={{ color: T.sageDark, fontSize: 14 }}>{showTestimonies ? "▲" : "▾"}</span>
+      </button>
+
+      {showTestimonies && (
+        <div style={{ marginBottom: 16 }}>
+          {testimonies.length === 0 && (
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, padding: "12px 0", fontStyle: "italic", textAlign: "center" }}>No answered prayers yet — keep praying!</div>
+          )}
+          {testimonies.map(p => (
+            <Card key={p.id} style={{ borderLeft: `3px solid ${T.sage}`, marginBottom: 8 }}>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16, fontWeight: 600, color: T.ink, marginBottom: 4 }}>{p.title}</div>
+              {p.answeredNote && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, lineHeight: 1.5 }}>{p.answeredNote}</div>}
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, marginTop: 6 }}>{fmt(p.date)}</div>
+            </Card>
           ))}
         </div>
-      </Card>
-      <Btn variant="ghost" style={{ width: "100%", justifyContent: "center", marginTop: 20, color: T.dustyRose }} onClick={onSignOut}>Sign Out</Btn>
+      )}
+
+      <Btn variant="ghost" style={{ width: "100%", justifyContent: "center", marginTop: 8, color: T.dustyRose }} onClick={onSignOut}>Sign Out</Btn>
     </div>
   );
 }
@@ -1776,6 +1880,13 @@ export default function App() {
         // Track activity
         await setDoc(doc(db, "userActivity", firebaseUser.uid), {
           lastActive: new Date().toISOString(),
+        }, { merge: true });
+        // Log daily activity for streak tracking
+        const todayStr = new Date().toISOString().split("T")[0];
+        await setDoc(doc(db, "dailyActivity", `${firebaseUser.uid}_${todayStr}`), {
+          userId: firebaseUser.uid,
+          date: todayStr,
+          createdAt: new Date().toISOString(),
         }, { merge: true });
 // Bucket 3 — Web Push subscription
         try {
