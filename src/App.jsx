@@ -103,6 +103,7 @@ function Btn({ children, onClick, variant = "primary", style = {}, small = false
 
 function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToList, myPrayingIds, onTogglePraying, activePrayMode = false, covered = false, onToggleCovered, alreadyAdded = false, friends = [] }) {
   const [expanded, setExpanded] = useState(false);
+  const [verseIndex, setVerseIndex] = useState(Math.floor(Math.random() * 24));
   const days = daysBetween(prayer.date, today());
   const isPraying = myPrayingIds?.includes(prayer.id);
   const isAnswered = prayer.status === "answered";
@@ -153,6 +154,18 @@ function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToLi
               <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16, color: T.ink, lineHeight: 1.5 }}>{prayer.answeredNote}</div>
             </div>
           )}
+          {!isAnswered && (() => {
+            const verse = getVerseForPrayer(cats, verseIndex);
+            return verse ? (
+              <div style={{ borderTop: `1px solid #E0D9F5`, marginTop: 8, paddingTop: 10, marginBottom: 10 }}>
+                <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 15, color: T.inkLight, lineHeight: 1.6, fontStyle: "italic" }}>"{verse.text}"</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: "#7C6FAB", fontWeight: 500 }}>{verse.ref}</div>
+                  <button onClick={(e) => { e.stopPropagation(); setVerseIndex(v => v + 1); }} style={{ border: "none", background: "none", fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: "#7C6FAB", cursor: "pointer", padding: 0 }}>another verse →</button>
+                </div>
+              </div>
+            ) : null;
+          })()}
           {!mine && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <Btn small variant={isPraying ? "secondary" : "ghost"} onClick={() => onTogglePraying(prayer.id)}>🙏 {isPraying ? "Praying" : "I'm Praying"} {prayer.praying > 0 && `(${prayer.praying})`}</Btn>
@@ -1039,6 +1052,199 @@ function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequest
 }
 
 
+
+// ── Scripture Library ─────────────────────────────────────────────────────────
+const VERSES = {
+  "Family": [
+    { text: "Children are a heritage from the Lord, offspring a reward from him.", ref: "Psalm 127:3" },
+    { text: "Honor your father and your mother, so that you may live long in the land.", ref: "Exodus 20:12" },
+    { text: "As for me and my household, we will serve the Lord.", ref: "Joshua 24:15" },
+    { text: "Love is patient, love is kind. It does not envy, it does not boast.", ref: "1 Corinthians 13:4" },
+    { text: "Bear with each other and forgive one another if any of you has a grievance against someone.", ref: "Colossians 3:13" },
+    { text: "A friend loves at all times, and a brother is born for a time of adversity.", ref: "Proverbs 17:17" },
+    { text: "Start children off on the way they should go, and even when they are old they will not turn from it.", ref: "Proverbs 22:6" },
+    { text: "How good and pleasant it is when God's people live together in unity.", ref: "Psalm 133:1" },
+    { text: "Above all, love each other deeply, because love covers over a multitude of sins.", ref: "1 Peter 4:8" },
+    { text: "Be completely humble and gentle; be patient, bearing with one another in love.", ref: "Ephesians 4:2" },
+    { text: "And over all these virtues put on love, which binds them all together in perfect unity.", ref: "Colossians 3:14" },
+    { text: "Therefore encourage one another and build each other up.", ref: "1 Thessalonians 5:11" },
+    { text: "He who finds a wife finds what is good and receives favor from the Lord.", ref: "Proverbs 18:22" },
+    { text: "Two are better than one, because they have a good return for their labor.", ref: "Ecclesiastes 4:9" },
+    { text: "The Lord bless you and keep you; the Lord make his face shine on you.", ref: "Numbers 6:24-25" },
+    { text: "I have no greater joy than to hear that my children are walking in the truth.", ref: "3 John 1:4" },
+    { text: "Like arrows in the hands of a warrior are children born in one's youth.", ref: "Psalm 127:4" },
+    { text: "May the Lord make your love increase and overflow for each other and for everyone else.", ref: "1 Thessalonians 3:12" },
+    { text: "Husbands, love your wives, just as Christ loved the church.", ref: "Ephesians 5:25" },
+    { text: "Her children arise and call her blessed; her husband also, and he praises her.", ref: "Proverbs 31:28" },
+    { text: "Do not let any unwholesome talk come out of your mouths, but only what is helpful for building others up.", ref: "Ephesians 4:29" },
+    { text: "Let us not become weary in doing good, for at the proper time we will reap a harvest.", ref: "Galatians 6:9" },
+    { text: "Be kind and compassionate to one another, forgiving each other, just as in Christ God forgave you.", ref: "Ephesians 4:32" },
+    { text: "My command is this: Love each other as I have loved you.", ref: "John 15:12" },
+  ],
+  "Health": [
+    { text: "He heals the brokenhearted and binds up their wounds.", ref: "Psalm 147:3" },
+    { text: "The Lord will sustain them on their sickbed and restore them from their bed of illness.", ref: "Psalm 41:3" },
+    { text: "I am the Lord, who heals you.", ref: "Exodus 15:26" },
+    { text: "Do you not know that your bodies are temples of the Holy Spirit?", ref: "1 Corinthians 6:19" },
+    { text: "Dear friend, I pray that you may enjoy good health and that all may go well with you.", ref: "3 John 1:2" },
+    { text: "He himself bore our sins in his body so that we might die to sins and live for righteousness; by his wounds you have been healed.", ref: "1 Peter 2:24" },
+    { text: "A cheerful heart is good medicine, but a crushed spirit dries up the bones.", ref: "Proverbs 17:22" },
+    { text: "But I will restore you to health and heal your wounds, declares the Lord.", ref: "Jeremiah 30:17" },
+    { text: "Jesus went throughout Galilee, teaching in their synagogues, proclaiming the good news and healing every disease.", ref: "Matthew 4:23" },
+    { text: "Is anyone among you sick? Let them call the elders of the church to pray over them.", ref: "James 5:14" },
+    { text: "Surely he took up our pain and bore our suffering.", ref: "Isaiah 53:4" },
+    { text: "The prayer offered in faith will make the sick person well.", ref: "James 5:15" },
+    { text: "He said to her, Daughter, your faith has healed you. Go in peace.", ref: "Luke 8:48" },
+    { text: "My flesh and my heart may fail, but God is the strength of my heart.", ref: "Psalm 73:26" },
+    { text: "So do not fear, for I am with you; do not be dismayed, for I am your God. I will strengthen you.", ref: "Isaiah 41:10" },
+    { text: "Even youths grow tired and weary, but those who hope in the Lord will renew their strength.", ref: "Isaiah 40:31" },
+    { text: "The Lord is close to the brokenhearted and saves those who are crushed in spirit.", ref: "Psalm 34:18" },
+    { text: "Cast all your anxiety on him because he cares for you.", ref: "1 Peter 5:7" },
+    { text: "Peace I leave with you; my peace I give you.", ref: "John 14:27" },
+    { text: "Come to me, all you who are weary and burdened, and I will give you rest.", ref: "Matthew 11:28" },
+    { text: "I can do all this through him who gives me strength.", ref: "Philippians 4:13" },
+    { text: "The Lord is my shepherd, I lack nothing.", ref: "Psalm 23:1" },
+    { text: "He gives strength to the weary and increases the power of the weak.", ref: "Isaiah 40:29" },
+    { text: "And the God of all grace will himself restore you and make you strong, firm and steadfast.", ref: "1 Peter 5:10" },
+  ],
+  "Relationships": [
+    { text: "A new command I give you: Love one another. As I have loved you, so you must love one another.", ref: "John 13:34" },
+    { text: "Do to others as you would have them do to you.", ref: "Luke 6:31" },
+    { text: "Greater love has no one than this: to lay down one's life for one's friends.", ref: "John 15:13" },
+    { text: "Be devoted to one another in love. Honor one another above yourselves.", ref: "Romans 12:10" },
+    { text: "Let love be genuine. Abhor what is evil; hold fast to what is good.", ref: "Romans 12:9" },
+    { text: "Carry each other's burdens, and in this way you will fulfill the law of Christ.", ref: "Galatians 6:2" },
+    { text: "Perfume and incense bring joy to the heart, and the pleasantness of a friend springs from their heartfelt advice.", ref: "Proverbs 27:9" },
+    { text: "As iron sharpens iron, so one person sharpens another.", ref: "Proverbs 27:17" },
+    { text: "Do not be misled: Bad company corrupts good character.", ref: "1 Corinthians 15:33" },
+    { text: "Whoever would foster love covers over an offense, but whoever repeats the matter separates close friends.", ref: "Proverbs 17:9" },
+    { text: "Wounds from a friend can be trusted, but an enemy multiplies kisses.", ref: "Proverbs 27:6" },
+    { text: "Do nothing out of selfish ambition or vain conceit. Value others above yourselves.", ref: "Philippians 2:3" },
+    { text: "Love your neighbor as yourself.", ref: "Matthew 22:39" },
+    { text: "Let no debt remain outstanding, except the continuing debt to love one another.", ref: "Romans 13:8" },
+    { text: "Accept one another, then, just as Christ accepted you.", ref: "Romans 15:7" },
+    { text: "Speak to one another with psalms, hymns, and songs from the Spirit.", ref: "Ephesians 5:19" },
+    { text: "Live in harmony with one another.", ref: "Romans 12:16" },
+    { text: "Submit to one another out of reverence for Christ.", ref: "Ephesians 5:21" },
+    { text: "Be completely humble and gentle; be patient, bearing with one another in love.", ref: "Ephesians 4:2" },
+    { text: "And let us consider how we may spur one another on toward love and good deeds.", ref: "Hebrews 10:24" },
+    { text: "The generous will themselves be blessed, for they share their food with the poor.", ref: "Proverbs 22:9" },
+    { text: "Clothe yourselves with compassion, kindness, humility, gentleness and patience.", ref: "Colossians 3:12" },
+    { text: "Rejoice with those who rejoice; mourn with those who mourn.", ref: "Romans 12:15" },
+    { text: "Love does no harm to a neighbor. Therefore love is the fulfillment of the law.", ref: "Romans 13:10" },
+  ],
+  "Work / Career": [
+    { text: "Whatever you do, work at it with all your heart, as working for the Lord, not for human masters.", ref: "Colossians 3:23" },
+    { text: "Commit to the Lord whatever you do, and he will establish your plans.", ref: "Proverbs 16:3" },
+    { text: "For we are God's handiwork, created in Christ Jesus to do good works.", ref: "Ephesians 2:10" },
+    { text: "The plans of the diligent lead to profit as surely as haste leads to poverty.", ref: "Proverbs 21:5" },
+    { text: "Do you see someone skilled in their work? They will serve before kings.", ref: "Proverbs 22:29" },
+    { text: "And my God will meet all your needs according to the riches of his glory in Christ Jesus.", ref: "Philippians 4:19" },
+    { text: "Trust in the Lord with all your heart and lean not on your own understanding.", ref: "Proverbs 3:5" },
+    { text: "In all your ways submit to him, and he will make your paths straight.", ref: "Proverbs 3:6" },
+    { text: "For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you.", ref: "Jeremiah 29:11" },
+    { text: "Be strong and courageous. Do not be afraid; do not be discouraged.", ref: "Joshua 1:9" },
+    { text: "The Lord your God will be with you wherever you go.", ref: "Joshua 1:9" },
+    { text: "Let your light shine before others, that they may see your good deeds.", ref: "Matthew 5:16" },
+    { text: "Diligent hands will rule, but laziness ends in forced labor.", ref: "Proverbs 12:24" },
+    { text: "The blessing of the Lord brings wealth, without painful toil for it.", ref: "Proverbs 10:22" },
+    { text: "She sets about her work vigorously; her arms are strong for her tasks.", ref: "Proverbs 31:17" },
+    { text: "Unless the Lord builds the house, the builders labor in vain.", ref: "Psalm 127:1" },
+    { text: "May the favor of the Lord our God rest on us; establish the work of our hands.", ref: "Psalm 90:17" },
+    { text: "Lazy hands make for poverty, but diligent hands bring wealth.", ref: "Proverbs 10:4" },
+    { text: "One who is slack in his work is brother to one who destroys.", ref: "Proverbs 18:9" },
+    { text: "Whatever your hand finds to do, do it with all your might.", ref: "Ecclesiastes 9:10" },
+    { text: "Do not conform to the pattern of this world, but be transformed by the renewing of your mind.", ref: "Romans 12:2" },
+    { text: "I press on toward the goal to win the prize for which God has called me heavenward.", ref: "Philippians 3:14" },
+    { text: "No, in all these things we are more than conquerors through him who loved us.", ref: "Romans 8:37" },
+    { text: "For God gave us a spirit not of fear but of power and love and self-control.", ref: "2 Timothy 1:7" },
+  ],
+  "Spiritual Growth": [
+    { text: "But grow in the grace and knowledge of our Lord and Savior Jesus Christ.", ref: "2 Peter 3:18" },
+    { text: "I am the vine; you are the branches. If you remain in me and I in you, you will bear much fruit.", ref: "John 15:5" },
+    { text: "Your word is a lamp for my feet, a light on my path.", ref: "Psalm 119:105" },
+    { text: "Do not merely listen to the word, and so deceive yourselves. Do what it says.", ref: "James 1:22" },
+    { text: "Create in me a pure heart, O God, and renew a steadfast spirit within me.", ref: "Psalm 51:10" },
+    { text: "Search me, God, and know my heart; test me and know my anxious thoughts.", ref: "Psalm 139:23" },
+    { text: "Delight yourself in the Lord, and he will give you the desires of your heart.", ref: "Psalm 37:4" },
+    { text: "Be still, and know that I am God.", ref: "Psalm 46:10" },
+    { text: "Draw near to God, and he will draw near to you.", ref: "James 4:8" },
+    { text: "The Spirit himself testifies with our spirit that we are God's children.", ref: "Romans 8:16" },
+    { text: "So whether you eat or drink or whatever you do, do it all for the glory of God.", ref: "1 Corinthians 10:31" },
+    { text: "Pray continually, give thanks in all circumstances.", ref: "1 Thessalonians 5:17-18" },
+    { text: "If any of you lacks wisdom, you should ask God, who gives generously to all.", ref: "James 1:5" },
+    { text: "The Lord is near to all who call on him, to all who call on him in truth.", ref: "Psalm 145:18" },
+    { text: "For it is God who works in you to will and to act in order to fulfill his good purpose.", ref: "Philippians 2:13" },
+    { text: "Therefore, if anyone is in Christ, the new creation has come: The old has gone, the new is here!", ref: "2 Corinthians 5:17" },
+    { text: "I have been crucified with Christ and I no longer live, but Christ lives in me.", ref: "Galatians 2:20" },
+    { text: "Set your minds on things above, not on earthly things.", ref: "Colossians 3:2" },
+    { text: "But seek first his kingdom and his righteousness, and all these things will be given to you.", ref: "Matthew 6:33" },
+    { text: "Blessed are those who hunger and thirst for righteousness, for they will be filled.", ref: "Matthew 5:6" },
+    { text: "The heart is deceitful above all things — but I the Lord search the heart.", ref: "Jeremiah 17:9-10" },
+    { text: "Let the word of Christ dwell in you richly as you teach and admonish one another with all wisdom.", ref: "Colossians 3:16" },
+    { text: "He must become greater; I must become less.", ref: "John 3:30" },
+    { text: "Now to him who is able to do immeasurably more than all we ask or imagine.", ref: "Ephesians 3:20" },
+  ],
+  "Finances": [
+    { text: "And my God will meet all your needs according to the riches of his glory in Christ Jesus.", ref: "Philippians 4:19" },
+    { text: "Honor the Lord with your wealth, with the firstfruits of all your crops.", ref: "Proverbs 3:9" },
+    { text: "Keep your lives free from the love of money and be content with what you have.", ref: "Hebrews 13:5" },
+    { text: "For the love of money is a root of all kinds of evil.", ref: "1 Timothy 6:10" },
+    { text: "No one can serve two masters. You cannot serve both God and money.", ref: "Matthew 6:24" },
+    { text: "Bring the whole tithe into the storehouse... and see if I will not throw open the floodgates of heaven.", ref: "Malachi 3:10" },
+    { text: "The generous will themselves be blessed, for they share their food with the poor.", ref: "Proverbs 22:9" },
+    { text: "Give, and it will be given to you. A good measure, pressed down, shaken together.", ref: "Luke 6:38" },
+    { text: "Do not store up for yourselves treasures on earth, where moths and vermin destroy.", ref: "Matthew 6:19" },
+    { text: "But store up for yourselves treasures in heaven.", ref: "Matthew 6:20" },
+    { text: "I know what it is to be in need, and I know what it is to have plenty.", ref: "Philippians 4:12" },
+    { text: "I have learned the secret of being content in any and every situation.", ref: "Philippians 4:11" },
+    { text: "A good person leaves an inheritance for their children's children.", ref: "Proverbs 13:22" },
+    { text: "Dishonest money dwindles away, but whoever gathers money little by little makes it grow.", ref: "Proverbs 13:11" },
+    { text: "The blessing of the Lord brings wealth, without painful toil for it.", ref: "Proverbs 10:22" },
+    { text: "Wealth gained hastily will dwindle, but whoever gathers little by little will increase it.", ref: "Proverbs 13:11" },
+    { text: "Cast your cares on the Lord and he will sustain you.", ref: "Psalm 55:22" },
+    { text: "Trust in the Lord with all your heart and lean not on your own understanding.", ref: "Proverbs 3:5" },
+    { text: "Seek the Kingdom of God above all else, and he will give you everything you need.", ref: "Luke 12:31" },
+    { text: "The earth is the Lord's, and everything in it, the world, and all who live in it.", ref: "Psalm 24:1" },
+    { text: "You shall remember the Lord your God, for it is he who gives you power to get wealth.", ref: "Deuteronomy 8:18" },
+    { text: "Whoever sows sparingly will also reap sparingly, and whoever sows generously will also reap generously.", ref: "2 Corinthians 9:6" },
+    { text: "Each of you should give what you have decided in your heart to give, not reluctantly or under compulsion.", ref: "2 Corinthians 9:7" },
+    { text: "And God is able to bless you abundantly, so that in all things at all times, you will abound in every good work.", ref: "2 Corinthians 9:8" },
+  ],
+  "default": [
+    { text: "Cast all your anxiety on him because he cares for you.", ref: "1 Peter 5:7" },
+    { text: "I can do all this through him who gives me strength.", ref: "Philippians 4:13" },
+    { text: "The Lord is my shepherd, I lack nothing.", ref: "Psalm 23:1" },
+    { text: "For I know the plans I have for you, declares the Lord.", ref: "Jeremiah 29:11" },
+    { text: "Be still, and know that I am God.", ref: "Psalm 46:10" },
+    { text: "Trust in the Lord with all your heart.", ref: "Proverbs 3:5" },
+    { text: "The Lord is close to the brokenhearted.", ref: "Psalm 34:18" },
+    { text: "Do not be anxious about anything, but in every situation, by prayer and petition, present your requests to God.", ref: "Philippians 4:6" },
+    { text: "And we know that in all things God works for the good of those who love him.", ref: "Romans 8:28" },
+    { text: "Come to me, all you who are weary and burdened, and I will give you rest.", ref: "Matthew 11:28" },
+    { text: "The Lord will fight for you; you need only to be still.", ref: "Exodus 14:14" },
+    { text: "Even though I walk through the darkest valley, I will fear no evil, for you are with me.", ref: "Psalm 23:4" },
+    { text: "For God so loved the world that he gave his one and only Son.", ref: "John 3:16" },
+    { text: "I have told you these things, so that in me you may have peace.", ref: "John 16:33" },
+    { text: "Now faith is confidence in what we hope for and assurance about what we do not see.", ref: "Hebrews 11:1" },
+    { text: "Jesus looked at them and said, With man this is impossible, but with God all things are possible.", ref: "Matthew 19:26" },
+    { text: "Ask and it will be given to you; seek and you will find.", ref: "Matthew 7:7" },
+    { text: "If God is for us, who can be against us?", ref: "Romans 8:31" },
+    { text: "My grace is sufficient for you, for my power is made perfect in weakness.", ref: "2 Corinthians 12:9" },
+    { text: "The name of the Lord is a fortified tower; the righteous run to it and are safe.", ref: "Proverbs 18:10" },
+    { text: "Give thanks to the Lord, for he is good; his love endures forever.", ref: "Psalm 107:1" },
+    { text: "The Lord himself goes before you and will be with you.", ref: "Deuteronomy 31:8" },
+    { text: "Those who hope in the Lord will renew their strength.", ref: "Isaiah 40:31" },
+    { text: "This is the day the Lord has made; let us rejoice and be glad in it.", ref: "Psalm 118:24" },
+  ],
+};
+
+const getVerseForPrayer = (categories, index = 0) => {
+  const cat = Array.isArray(categories) ? categories[0] : categories;
+  const pool = VERSES[cat] || VERSES["default"];
+  return pool[index % pool.length];
+};
+
 // ── Reflect Tab ───────────────────────────────────────────────────────────────
 const REFLECT_COLORS = {
   guided:    { border: "#5C8068", bg: "#F0F5F1", icon: "#5C8068", light: "#D4E4D8" },
@@ -1049,11 +1255,11 @@ const REFLECT_COLORS = {
 
 const SCRIPTURE_THEMES = ["Peace", "Healing", "Family", "Wisdom", "Provision", "Strength", "Hope", "Trust"];
 
-function ReflectCard({ type, title, subtitle, expanded, onToggle, children }) {
+function ReflectCard({ type, title, subtitle, expanded, onToggle, children, disabled = false }) {
   const c = REFLECT_COLORS[type];
   return (
-    <div style={{ background: T.white, borderRadius: 16, marginBottom: 14, boxShadow: "0 1px 8px rgba(0,0,0,0.06)", overflow: "hidden", borderLeft: `4px solid ${c.border}` }}>
-      <button onClick={onToggle} style={{ width: "100%", border: "none", background: "none", padding: "16px 18px", cursor: "pointer", display: "flex", alignItems: "center", gap: 14, textAlign: "left" }}>
+    <div style={{ background: T.white, borderRadius: 16, marginBottom: 14, boxShadow: "0 1px 8px rgba(0,0,0,0.06)", overflow: "hidden", borderLeft: `4px solid ${disabled ? T.parchment : c.border}`, opacity: disabled ? 0.5 : 1 }}>
+      <button onClick={disabled ? undefined : onToggle} style={{ width: "100%", border: "none", background: "none", padding: "16px 18px", cursor: disabled ? "default" : "pointer", display: "flex", alignItems: "center", gap: 14, textAlign: "left" }}>
         <div style={{ width: 52, height: 52, borderRadius: "50%", background: c.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <span style={{ fontSize: 22 }}>{type === "guided" ? "🙏" : type === "composer" ? "✏️" : type === "journal" ? "📓" : "📖"}</span>
         </div>
@@ -1404,11 +1610,11 @@ function Reflect({ prayers, user, addPrayer }) {
         <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>Write, listen, and rest in the Word.</div>
       </div>
 
-      <ReflectCard type="guided" title="Guided Prayer" subtitle="Gentle prompts to help shape what's on your heart." expanded={expanded === "guided"} onToggle={() => toggle("guided")}>
+      <ReflectCard type="guided" title="Guided Prayer" subtitle="Coming soon — gentle prompts to shape what's on your heart." expanded={false} onToggle={() => {}} disabled={true}>
         <GuidedPrayer onAddPrayer={addPrayer} />
       </ReflectCard>
 
-      <ReflectCard type="composer" title="Prayer Composer" subtitle="Turn a burden or situation into a personal prayer." expanded={expanded === "composer"} onToggle={() => toggle("composer")}>
+      <ReflectCard type="composer" title="Prayer Composer" subtitle="Coming soon — turn a burden into a personal prayer." expanded={false} onToggle={() => {}} disabled={true}>
         <PrayerComposer prayers={prayers} onAddPrayer={addPrayer} onSaveJournal={saveJournal} />
       </ReflectCard>
 
@@ -1416,9 +1622,7 @@ function Reflect({ prayers, user, addPrayer }) {
         <PrayerJournal prayers={prayers} onSaveJournal={saveJournal} />
       </ReflectCard>
 
-      <ReflectCard type="scripture" title="Scripture & Themes" subtitle="Browse verses by topic and bring the Word into prayer." expanded={expanded === "scripture"} onToggle={() => toggle("scripture")}>
-        <ScriptureThemes prayers={prayers} />
-      </ReflectCard>
+
 
       {journalEntries.length > 0 && (
         <div style={{ marginTop: 8 }}>
