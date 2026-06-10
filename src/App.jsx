@@ -1753,6 +1753,7 @@ function Reflect({ prayers, user, addPrayer }) {
   const [expanded, setExpanded] = useState(null);
   const [journalEntries, setJournalEntries] = useState([]);
   const [viewEntry, setViewEntry] = useState(null);
+  const [showAllJournal, setShowAllJournal] = useState(false);
 
   const toggle = (id) => setExpanded(prev => prev === id ? null : id);
 
@@ -1807,9 +1808,16 @@ function Reflect({ prayers, user, addPrayer }) {
         <div style={{ marginTop: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: REFLECT_COLORS.guided.border, fontWeight: 600, letterSpacing: 0.5 }}>Recent Reflections</div>
-            <button style={{ border: "none", background: "none", fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: REFLECT_COLORS.guided.border, cursor: "pointer", fontWeight: 500 }}>See all ›</button>
+            {journalEntries.length > 5 && (
+              <button
+                onClick={() => setShowAllJournal(prev => !prev)}
+                style={{ border: "none", background: "none", fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: REFLECT_COLORS.guided.border, cursor: "pointer", fontWeight: 500 }}
+              >
+                {showAllJournal ? "Show less ›" : `See all ${journalEntries.length} ›`}
+              </button>
+            )}
           </div>
-          {journalEntries.slice(0, 5).map(e => (
+          {(showAllJournal ? journalEntries : journalEntries.slice(0, 5)).map(e => (
             <div key={e.id} onClick={() => setViewEntry(e)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: `1px solid ${T.parchment}`, cursor: "pointer" }}>
               <span style={{ fontSize: 18, flexShrink: 0 }}>{typeIcon(e.type)}</span>
               <div style={{ flex: 1 }}>
