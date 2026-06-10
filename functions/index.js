@@ -177,15 +177,26 @@ exports.claudeProxy = onCall(
         let data = "";
         res.on("data", chunk => data += chunk);
         res.on("end", () => {
+          console.log("Anthropic status:", res.statusCode);
+          console.log("Anthropic response:", data.slice(0, 500));
           try {
             const parsed = JSON.parse(data);
+            if (parsed.error) {
+              console.error("Anthropic error:", parsed.error);
+              reject(new Error(parsed.error.message || "Anthropic API error"));
+              return;
+            }
             resolve({ text: parsed.content?.[0]?.text || "" });
           } catch (e) {
+            console.error("Parse error:", e.message, "Raw:", data.slice(0, 200));
             reject(new Error("Failed to parse response"));
           }
         });
       });
-      req.on("error", reject);
+      req.on("error", (e) => {
+        console.error("Request error:", e.message);
+        reject(e);
+      });
       req.write(body);
       req.end();
     });
