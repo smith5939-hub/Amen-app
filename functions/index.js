@@ -15,6 +15,19 @@ const VAPID_PRIVATE = "xr3Ga8Yj2WGonS1RfgbIUn8rN1Ox2CBP5V_QjWI5Gi8";
 webpush.setVapidDetails("mailto:smith.5939@gmail.com", VAPID_PUBLIC, VAPID_PRIVATE);
 
 async function sendPushToUser(userId, title, body, type = "general") {
+  // Deduplication check — skip if same notification sent in last 60 seconds
+  const cutoff = new Date(Date.now() - 60 * 1000).toISOString();
+  const dupeSnap = await db.collection("notifications")
+    .where("toUid", "==", userId)
+    .where("type", "==", type)
+    .where("title", "==", title)
+    .where("body", "==", body)
+    .where("createdAt", ">", cutoff)
+    .get();
+  if (!dupeSnap.empty) {
+    console.log("Duplicate notification skipped:", title);
+    return;
+  }
   // Write to Firestore notifications collection
   await db.collection("notifications").add({
     toUid: userId,
