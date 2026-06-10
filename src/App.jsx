@@ -16,6 +16,33 @@ const FontLink = () => {
     link.rel = "stylesheet";
     link.href = "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap";
     document.head.appendChild(link);
+
+    const style = document.createElement("style");
+    style.innerHTML = `
+      html, body, #root {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        min-height: 100%;
+        background: #FAF8F4;
+        overflow-x: hidden;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(link);
+      document.head.removeChild(style);
+    };
   }, []);
   return null;
 };
