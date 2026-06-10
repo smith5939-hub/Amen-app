@@ -1911,7 +1911,12 @@ export default function App() {
   if (user === undefined) {
     return (
       <div style={{ minHeight: "100vh", background: T.cream, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, color: T.sageDark, letterSpacing: 3 }}>LIFT</div>
+  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18, fontWeight: 600, letterSpacing: 1 }}>
+        <span style={{ color: T.sageDark }}>L</span><span style={{ color: T.inkLight, fontWeight: 300 }}>og </span>
+        <span style={{ color: T.sageDark }}>I</span><span style={{ color: T.inkLight, fontWeight: 300 }}>t </span>
+        <span style={{ color: T.sageDark }}>F</span><span style={{ color: T.inkLight, fontWeight: 300 }}>or </span>
+        <span style={{ color: T.sageDark }}>T</span><span style={{ color: T.inkLight, fontWeight: 300 }}>ransformation</span>
+      </div>
       </div>
     );
   }
@@ -1926,7 +1931,12 @@ export default function App() {
       <ToastProvider>
         <div style={{ minHeight: "100vh", background: T.cream }}>
           <div style={{ position: "sticky", top: 0, zIndex: 90, background: T.cream, textAlign: "center", padding: "14px 0 10px", borderBottom: `1px solid ${T.parchment}` }}>
-            <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 600, color: T.sageDark, letterSpacing: 3 }}>LIFT</span>
+<span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18, fontWeight: 600, letterSpacing: 1 }}>
+              <span style={{ color: T.sageDark }}>L</span><span style={{ color: T.inkLight, fontWeight: 300 }}>og </span>
+              <span style={{ color: T.sageDark }}>I</span><span style={{ color: T.inkLight, fontWeight: 300 }}>t </span>
+              <span style={{ color: T.sageDark }}>F</span><span style={{ color: T.inkLight, fontWeight: 300 }}>or </span>
+              <span style={{ color: T.sageDark }}>T</span><span style={{ color: T.inkLight, fontWeight: 300 }}>ransformation</span>
+            </span>
           </div>
           {loadingPrayers ? (
             <div style={{ textAlign: "center", padding: "60px 20px", fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight }}>Loading your prayers...</div>
