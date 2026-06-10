@@ -2,9 +2,9 @@ import { useState, useEffect, createContext, useContext } from "react";
 import { auth, db, functions } from "./firebase";
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "firebase/auth";
 import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 
 const callClaude = async (prompt) => {
-  const { functions } = await import("./firebase");
   const proxy = httpsCallable(functions, "claudeProxy");
   const result = await proxy({ prompt });
   return result.data.text;
