@@ -1610,16 +1610,16 @@ function Reflect({ prayers, user, addPrayer }) {
         <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>Write, listen, and rest in the Word.</div>
       </div>
 
+      <ReflectCard type="journal" title="Prayer Journal" subtitle="Write freely and pray through your list." expanded={expanded === "journal"} onToggle={() => toggle("journal")}>
+        <PrayerJournal prayers={prayers} onSaveJournal={saveJournal} />
+      </ReflectCard>
+
       <ReflectCard type="guided" title="Guided Prayer" subtitle="Coming soon — gentle prompts to shape what's on your heart." expanded={false} onToggle={() => {}} disabled={true}>
         <GuidedPrayer onAddPrayer={addPrayer} />
       </ReflectCard>
 
       <ReflectCard type="composer" title="Prayer Composer" subtitle="Coming soon — turn a burden into a personal prayer." expanded={false} onToggle={() => {}} disabled={true}>
         <PrayerComposer prayers={prayers} onAddPrayer={addPrayer} onSaveJournal={saveJournal} />
-      </ReflectCard>
-
-      <ReflectCard type="journal" title="Prayer Journal" subtitle="Write freely and pray through your list." expanded={expanded === "journal"} onToggle={() => toggle("journal")}>
-        <PrayerJournal prayers={prayers} onSaveJournal={saveJournal} />
       </ReflectCard>
 
 
