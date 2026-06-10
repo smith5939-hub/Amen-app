@@ -653,7 +653,7 @@ function Toggle({ val, onToggle }) {
 function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) {
   const showToast = useToast();
   const [remindersOn, setRemindersOn] = useState(true);
-  const [reminderTime, setReminderTime] = useState("morning");
+  const [reminderTimes, setReminderTimes] = useState(["morning"]);
   const [notifyPrayed, setNotifyPrayed] = useState(true);
   const [notifyEncourage, setNotifyEncourage] = useState(true);
 
@@ -663,7 +663,8 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
       if (snap.exists()) {
         const d = snap.data();
         if (d.remindersOn !== undefined) setRemindersOn(d.remindersOn);
-        if (d.reminderTime) setReminderTime(d.reminderTime);
+        if (d.reminderTimes) setReminderTimes(d.reminderTimes);
+        else if (d.reminderTime) setReminderTimes([d.reminderTime]);
         if (d.notifyPrayed !== undefined) setNotifyPrayed(d.notifyPrayed);
         if (d.notifyEncourage !== undefined) setNotifyEncourage(d.notifyEncourage);
       }
@@ -671,7 +672,8 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
   }, [user]);
 
   const saveSettings = async (updates) => {
-    await setDoc(doc(db, "userSettings", user.uid), updates, { merge: true });
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    await setDoc(doc(db, "userSettings", user.uid), { ...updates, timezone }, { merge: true });
     showToast("Settings saved");
   };
 
@@ -714,12 +716,19 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
           <div>
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, marginBottom: 8 }}>Remind me in the</div>
             <div style={{ display: "flex", gap: 8 }}>
-              {REMINDER_TIMES.map(t => (
-                <button key={t.id} onClick={() => { setReminderTime(t.id); saveSettings({ reminderTime: t.id }); }} style={{ flex: 1, border: `1.5px solid ${reminderTime === t.id ? T.sageDark : T.parchment}`, background: reminderTime === t.id ? T.sageLight : "transparent", borderRadius: 12, padding: "8px 4px", cursor: "pointer", textAlign: "center" }}>
-                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: reminderTime === t.id ? 500 : 400, color: reminderTime === t.id ? T.sageDark : T.ink }}>{t.label}</div>
+              {REMINDER_TIMES.map(t => {
+                const selected = reminderTimes.includes(t.id);
+                return (
+                <button key={t.id} onClick={() => {
+                  const updated = selected ? reminderTimes.filter(x => x !== t.id) : [...reminderTimes, t.id];
+                  const final = updated.length ? updated : [t.id];
+                  setReminderTimes(final);
+                  saveSettings({ reminderTimes: final });
+                }} style={{ flex: 1, border: `1.5px solid ${selected ? T.sageDark : T.parchment}`, background: selected ? T.sageLight : "transparent", borderRadius: 12, padding: "8px 4px", cursor: "pointer", textAlign: "center" }}>
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: selected ? 500 : 400, color: selected ? T.sageDark : T.ink }}>{t.label}</div>
                   <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight }}>{t.sub}</div>
-                </button>
-              ))}
+                </button>);
+              })}
             </div>
           </div>
         )}

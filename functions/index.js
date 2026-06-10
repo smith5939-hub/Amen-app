@@ -40,12 +40,25 @@ async function sendPushToUser(userId, title, body, type = "general") {
   }
 }
 
-exports.dailyPrayerReminder = onSchedule("every day 10:00", async () => {
+const REMINDER_HOURS = { morning: 8, midday: 12, evening: 20 };
+
+exports.dailyPrayerReminder = onSchedule("every 1 hours", async () => {
   const now = new Date();
   const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const usersSnap = await db.collection("users").get();
   for (const userDoc of usersSnap.docs) {
     const userId = userDoc.id;
+    // Get user settings
+    const settingsSnap = await db.collection("userSettings").doc(userId).get();
+    const settings = settingsSnap.exists ? settingsSnap.data() : {};
+    if (settings.remindersOn === false) continue;
+    const timezone = settings.timezone || "America/New_York";
+    const reminderTimes = settings.reminderTimes || ["morning"];
+    // Get current hour in user's timezone
+    const localHour = parseInt(new Intl.DateTimeFormat("en-US", { hour: "numeric", hour12: false, timeZone: timezone }).format(now));
+    const shouldRemind = reminderTimes.some(t => REMINDER_HOURS[t] === localHour);
+    if (!shouldRemind) continue;
+    // Check last activity
     const activitySnap = await db.collection("userActivity").doc(userId).get();
     const lastActive = activitySnap.exists ? new Date(activitySnap.data().lastActive) : null;
     if (!lastActive || lastActive < cutoff) {
