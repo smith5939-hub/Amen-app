@@ -843,7 +843,7 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
         {[
           { label: "Days Prayed", val: stats.daysPrayed },
-          { label: "Current Streak", val: `${stats.streak}d` },
+          { label: "Current Streak", val: stats.streak },
           { label: "Prayers Added", val: stats.totalPrayers },
           { label: "People Prayed For", val: stats.prayedFor },
           { label: "Prayed For You", val: stats.prayedByOthers },
