@@ -133,7 +133,7 @@ function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToLi
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, cursor: "pointer" }} onClick={() => setExpanded(!expanded)}>
           {isAnswered && <span style={{ fontSize: 12, color: T.sage }}>✓</span>}
           {showLock && <span style={{ fontSize: 11 }}>🔒</span>}
-          {prayer.prayerDate && !isAnswered && <span style={{ fontSize: 11 }}>📅</span>}
+          {prayer.prayerDate && !isAnswered && new Date(prayer.prayerDate) >= new Date(new Date().toISOString().split("T")[0]) && <span style={{ fontSize: 11 }}>📅</span>}
           <span style={{ fontSize: 10, color: T.inkLight, fontFamily: "'DM Sans', sans-serif" }}>{cats[0]?.split(" ")[0]}{cats.length > 1 ? ` +${cats.length - 1}` : ""}</span>
           <span style={{ color: T.parchment, fontSize: 14 }}>{expanded ? "▲" : "▾"}</span>
         </div>
@@ -145,7 +145,7 @@ function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToLi
             {isAnswered && <Badge label="✓ Answered" color={T.sage} />}
             {showLock && <Badge label="🔒 Private" color={T.inkLight} />}
             <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, alignSelf: "center" }}>{fmt(prayer.date)} · {days === 0 ? "Today" : `${days}d`}</span>
-            {prayer.prayerDate && !isAnswered && (() => { const daysUntil = daysBetween(today(), prayer.prayerDate); return <span style={{ background: daysUntil <= 1 ? T.dustyRoseLight : T.goldLight, color: daysUntil <= 1 ? T.dustyRose : T.gold, borderRadius: 20, padding: "2px 10px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>📅 {daysUntil === 0 ? "Today!" : daysUntil === 1 ? "Tomorrow!" : `${daysUntil}d away`}</span>; })()}
+            {prayer.prayerDate && !isAnswered && new Date(prayer.prayerDate) >= new Date(today()) && (() => { const daysUntil = daysBetween(today(), prayer.prayerDate); return <span style={{ background: daysUntil <= 1 ? T.dustyRoseLight : T.goldLight, color: daysUntil <= 1 ? T.dustyRose : T.gold, borderRadius: 20, padding: "2px 10px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>📅 {daysUntil === 0 ? "Today!" : daysUntil === 1 ? "Tomorrow!" : `${daysUntil}d away`}</span>; })()}
           </div>
           {prayer.note && <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, marginBottom: 12, lineHeight: 1.6 }}>{prayer.note}</p>}
           {isAnswered && prayer.answeredNote && (
@@ -168,8 +168,7 @@ function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToLi
           })()}
           {!mine && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <Btn small variant={isPraying ? "secondary" : "ghost"} onClick={() => onTogglePraying(prayer.id)}>🙏 {isPraying ? "Praying" : "I'm Praying"} {prayer.praying > 0 && `(${prayer.praying})`}</Btn>
-              <Btn small variant={alreadyAdded ? "secondary" : "gold"} onClick={() => onAddToList(prayer)}>{alreadyAdded ? "✓ On My List" : "+ My List"}</Btn>
+              <Btn small variant={isPraying ? "secondary" : "ghost"} onClick={() => onTogglePraying(prayer.id)}>🙏 {isPraying ? "Praying for this" : "I'm Praying"}</Btn>
             </div>
           )}
           {mine && prayer.status === "active" && (
@@ -357,7 +356,7 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
           <div style={pageTitle}>{firstName ? `${firstName}'s Prayers` : "My Prayers"}</div>
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>{active.length} active · {answered.length} answered</div>
         </div>
-        <Btn small onClick={() => setShowAdd(true)}>+ Add</Btn>
+        <Btn small onClick={() => setShowAdd(true)}>+ Add Prayer</Btn>
       </div>
       {activePrayMode ? (
         <div style={{ background: T.sageLight, borderRadius: 14, padding: "12px 16px", marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -490,10 +489,9 @@ function Feed({ friends, myPrayers, addPrayer, currentUser }) {
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: T.ink }}>{friend.displayName || "Friend"}</div>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{friend.prayers?.length || 0} shared prayer{(friend.prayers?.length || 0) !== 1 ? "s" : ""}</div>
             </div>
-            {friend.prayers?.length > 0 && <Btn small variant="ghost" onClick={() => addAll(friend)}>+ Add All</Btn>}
           </div>
           {(friend.prayers || []).map(p => (
-            <PrayerCard key={p.id} prayer={p} mine={false} myPrayingIds={prayingIds} onTogglePraying={(p) => togglePraying(p, friend)} onAddToList={(pr) => addToList(friend, pr)} alreadyAdded={addedKeys.includes(keyFor(friend, p))} />
+            <PrayerCard key={p.id} prayer={p} mine={false} myPrayingIds={prayingIds} onTogglePraying={(p) => togglePraying(p, friend)} />
           ))}
           {(!friend.prayers || friend.prayers.length === 0) && (
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, padding: "10px 0", fontStyle: "italic" }}>No public prayers shared yet.</div>
@@ -1133,10 +1131,9 @@ function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequest
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: T.ink }}>{friend.displayName || "Friend"}</div>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{friend.prayers?.length || 0} shared prayer{(friend.prayers?.length || 0) !== 1 ? "s" : ""}</div>
             </div>
-            {friend.prayers?.length > 0 && <Btn small variant="ghost" onClick={() => addAll(friend)}>+ Add All</Btn>}
           </div>
           {(friend.prayers || []).map(p => (
-            <PrayerCard key={p.id} prayer={p} mine={false} myPrayingIds={prayingIds} onTogglePraying={() => togglePraying(p)} onAddToList={(pr) => addToList(friend, pr)} alreadyAdded={addedKeys.includes(keyFor(friend, p))} />
+            <PrayerCard key={p.id} prayer={p} mine={false} myPrayingIds={prayingIds} onTogglePraying={() => togglePraying(p)} />
           ))}
           {(!friend.prayers || friend.prayers.length === 0) && (
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, padding: "10px 0", fontStyle: "italic" }}>No public prayers shared yet.</div>
@@ -1835,7 +1832,7 @@ const TABS = [
   { id: "community", icon: "👥", label: "Community" },
   { id: "reflect", icon: "📖", label: "Reflect" },
   { id: "notifications", icon: "🔔", label: "Notifications" },
-  { id: "profile", icon: "☽", label: "Profile" },
+  { id: "profile", icon: "🕊️", label: "Profile" },
 ];
 
 function BottomNav({ active, setActive, requestCount }) {
@@ -1863,6 +1860,7 @@ export default function App() {
   const [incomingRequests, setIncomingRequests] = useState([]);
   const [defaultPublic, setDefaultPublic] = useState(true);
   const [loadingPrayers, setLoadingPrayers] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -1967,6 +1965,15 @@ export default function App() {
     return unsub;
   }, [user]);
 
+  useEffect(() => {
+    if (!user) { setUnreadCount(0); return; }
+    const q = query(collection(db, "notifications"), where("toUid", "==", user.uid), where("read", "==", false));
+    const unsub = onSnapshot(q, (snap) => {
+      setUnreadCount(snap.docs.filter(d => !d.data().dismissed).length);
+    });
+    return unsub;
+  }, [user]);
+
   const addPrayer = async (fields) => {
     await addDoc(collection(db, "prayers"), {
       userId: user.uid,
@@ -2061,7 +2068,7 @@ export default function App() {
               {tab === "profile" && <Profile prayers={prayers} user={user} defaultPublic={defaultPublic} setDefaultPublic={setDefaultPublic} onSignOut={handleSignOut} />}
             </>
           )}
-          <BottomNav active={tab} setActive={setTab} requestCount={incomingRequests.length} />
+          <BottomNav active={tab} setActive={setTab} requestCount={incomingRequests.length + unreadCount} />
         </div>
       </ToastProvider>
     </>
