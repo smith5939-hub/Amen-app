@@ -144,8 +144,8 @@ function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToLi
             {cats.map(c => <CategoryPill key={c} cat={c} />)}
             {isAnswered && <Badge label="✓ Answered" color={T.sage} />}
             {showLock && <Badge label="🔒 Private" color={T.inkLight} />}
-            <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, alignSelf: "center" }}>{fmt(prayer.date)} · {days === 0 ? "Today" : `${days}d`}</span>
-            {prayer.prayerDate && !isAnswered && new Date(prayer.prayerDate) >= new Date(today()) && (() => { const daysUntil = daysBetween(today(), prayer.prayerDate); return <span style={{ background: daysUntil <= 1 ? T.dustyRoseLight : T.goldLight, color: daysUntil <= 1 ? T.dustyRose : T.gold, borderRadius: 20, padding: "2px 10px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>📅 {daysUntil === 0 ? "Today!" : daysUntil === 1 ? "Tomorrow!" : `${daysUntil}d away`}</span>; })()}
+            <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, alignSelf: "center" }}>{fmt(prayer.date)}</span>
+            {prayer.prayerDate && !isAnswered && (() => { const daysUntil = daysBetween(today(), prayer.prayerDate); return daysUntil >= 0 && daysUntil <= 1 ? <span style={{ background: T.dustyRoseLight, color: T.dustyRose, borderRadius: 20, padding: "2px 10px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>📅 {daysUntil === 0 ? "Today!" : "Tomorrow!"}</span> : null; })()}
           </div>
           {prayer.note && <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, marginBottom: 12, lineHeight: 1.6 }}>{prayer.note}</p>}
           {isAnswered && prayer.answeredNote && (
