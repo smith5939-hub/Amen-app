@@ -642,12 +642,45 @@ function Dashboard({ prayers }) {
   );
 }
 
+function Toggle({ val, onToggle }) {
+  return (
+    <div onClick={onToggle} style={{ width: 44, height: 24, borderRadius: 12, background: val ? T.sage : T.parchment, cursor: "pointer", position: "relative", flexShrink: 0 }}>
+      <div style={{ position: "absolute", top: 3, left: val ? 22 : 3, width: 18, height: 18, borderRadius: "50%", background: T.white, transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }} />
+    </div>
+  );
+}
+
 function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) {
-  const [notifications, setNotifications] = useState(true);
-  const settings = [
-    { label: "Prayer reminders", sub: "Daily nudge to check in", val: notifications, set: setNotifications },
-    { label: "Default to private", sub: "New prayers start private", val: !defaultPublic, set: (v) => setDefaultPublic(!v) },
+  const showToast = useToast();
+  const [remindersOn, setRemindersOn] = useState(true);
+  const [reminderTime, setReminderTime] = useState("morning");
+  const [notifyPrayed, setNotifyPrayed] = useState(true);
+  const [notifyEncourage, setNotifyEncourage] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    getDoc(doc(db, "userSettings", user.uid)).then(snap => {
+      if (snap.exists()) {
+        const d = snap.data();
+        if (d.remindersOn !== undefined) setRemindersOn(d.remindersOn);
+        if (d.reminderTime) setReminderTime(d.reminderTime);
+        if (d.notifyPrayed !== undefined) setNotifyPrayed(d.notifyPrayed);
+        if (d.notifyEncourage !== undefined) setNotifyEncourage(d.notifyEncourage);
+      }
+    });
+  }, [user]);
+
+  const saveSettings = async (updates) => {
+    await setDoc(doc(db, "userSettings", user.uid), updates, { merge: true });
+    showToast("Settings saved");
+  };
+
+  const REMINDER_TIMES = [
+    { id: "morning", label: "Morning", sub: "8:00 AM" },
+    { id: "midday", label: "Midday", sub: "12:00 PM" },
+    { id: "evening", label: "Evening", sub: "8:00 PM" },
   ];
+
   return (
     <div style={tabContent}>
       <div style={{ marginBottom: 24 }}><div style={pageTitle}>Profile</div></div>
@@ -658,16 +691,51 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>{user?.email || ""}</div>
         </div>
       </div>
-      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10 }}>Settings</div>
-      {settings.map(({ label, sub, val, set }) => (
+
+      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10 }}>General</div>
+      <Card style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 14, color: T.ink }}>Default to private</div>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>New prayers start private</div>
+        </div>
+        <Toggle val={!defaultPublic} onToggle={() => setDefaultPublic(!defaultPublic)} />
+      </Card>
+
+      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginTop: 20, marginBottom: 10 }}>Prayer Reminders</div>
+      <Card>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: remindersOn ? 16 : 0 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 14, color: T.ink }}>Daily reminder</div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>A nudge to check in and pray</div>
+          </div>
+          <Toggle val={remindersOn} onToggle={() => { const v = !remindersOn; setRemindersOn(v); saveSettings({ remindersOn: v }); }} />
+        </div>
+        {remindersOn && (
+          <div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, marginBottom: 8 }}>Remind me in the</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {REMINDER_TIMES.map(t => (
+                <button key={t.id} onClick={() => { setReminderTime(t.id); saveSettings({ reminderTime: t.id }); }} style={{ flex: 1, border: `1.5px solid ${reminderTime === t.id ? T.sageDark : T.parchment}`, background: reminderTime === t.id ? T.sageLight : "transparent", borderRadius: 12, padding: "8px 4px", cursor: "pointer", textAlign: "center" }}>
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: reminderTime === t.id ? 500 : 400, color: reminderTime === t.id ? T.sageDark : T.ink }}>{t.label}</div>
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight }}>{t.sub}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </Card>
+
+      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginTop: 20, marginBottom: 10 }}>Notification Types</div>
+      {[
+        { label: "Someone prayed for you", sub: "Know when a friend lifts you up", val: notifyPrayed, onToggle: () => { const v = !notifyPrayed; setNotifyPrayed(v); saveSettings({ notifyPrayed: v }); } },
+        { label: "Encouragement notes", sub: "Messages from friends who are praying", val: notifyEncourage, onToggle: () => { const v = !notifyEncourage; setNotifyEncourage(v); saveSettings({ notifyEncourage: v }); } },
+      ].map(({ label, sub, val, onToggle }) => (
         <Card key={label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 14, color: T.ink }}>{label}</div>
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{sub}</div>
           </div>
-          <div onClick={() => set(!val)} style={{ width: 44, height: 24, borderRadius: 12, background: val ? T.sage : T.parchment, cursor: "pointer", position: "relative", flexShrink: 0 }}>
-            <div style={{ position: "absolute", top: 3, left: val ? 22 : 3, width: 18, height: 18, borderRadius: "50%", background: T.white, transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }} />
-          </div>
+          <Toggle val={val} onToggle={onToggle} />
         </Card>
       ))}
       <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginTop: 20, marginBottom: 10 }}>Stats</div>
