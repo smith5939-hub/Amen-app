@@ -168,7 +168,7 @@ function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToLi
           })()}
           {!mine && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <Btn small variant={isPraying ? "secondary" : "ghost"} onClick={() => onTogglePraying(prayer.id)}>🙏 {isPraying ? "Praying for this" : "I'm Praying"}</Btn>
+              <Btn small variant={isPraying ? "secondary" : "ghost"} onClick={() => onTogglePraying(prayer)}>🙏 {isPraying ? "Praying for this" : "I'm Praying"}</Btn>
             </div>
           )}
           {mine && prayer.status === "active" && (
@@ -968,6 +968,26 @@ function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequest
         type: "encouragement",
         read: false,
         createdAt: new Date().toISOString(),
+      });
+    }
+
+    // Auto-add to Holding for Others when tapping "I'm Praying"
+    const key = `${prayer.userId}-${prayer.id}`;
+    const currentAddedKeys = myPrayers.filter(p => p.fromFriend).map(p => p.sourceKey);
+
+    if (!currentAddedKeys.includes(key)) {
+      const friendMatch = friends.find(f => f.uid === prayer.userId);
+
+      await addPrayer({
+        ...prayer,
+        sourceKey: key,
+        isPublic: false,
+        status: "active",
+        date: today(),
+        answeredNote: null,
+        praying: 0,
+        fromFriend: true,
+        ownerName: friendMatch?.displayName || prayer.ownerName || "Friend",
       });
     }
   };
