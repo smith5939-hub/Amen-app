@@ -133,7 +133,7 @@ function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToLi
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, cursor: "pointer" }} onClick={() => setExpanded(!expanded)}>
           {isAnswered && <span style={{ fontSize: 12, color: T.sage }}>✓</span>}
           {showLock && <span style={{ fontSize: 11 }}>🔒</span>}
-          {prayer.prayerDate && !isAnswered && new Date(prayer.prayerDate) >= new Date(new Date().toISOString().split("T")[0]) && <span style={{ fontSize: 11 }}>📅</span>}
+          {Boolean(prayer.prayerDate) && !isAnswered && (() => { const daysUntil = daysBetween(today(), prayer.prayerDate); return daysUntil >= 0 && daysUntil <= 1 ? <span style={{ fontSize: 11 }}>📅</span> : null; })()}
           <span style={{ fontSize: 10, color: T.inkLight, fontFamily: "'DM Sans', sans-serif" }}>{cats[0]?.split(" ")[0]}{cats.length > 1 ? ` +${cats.length - 1}` : ""}</span>
           <span style={{ color: T.parchment, fontSize: 14 }}>{expanded ? "▲" : "▾"}</span>
         </div>
@@ -145,7 +145,7 @@ function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToLi
             {isAnswered && <Badge label="✓ Answered" color={T.sage} />}
             {showLock && <Badge label="🔒 Private" color={T.inkLight} />}
             <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, alignSelf: "center" }}>{fmt(prayer.date)}</span>
-            {prayer.prayerDate && !isAnswered && (() => { const daysUntil = daysBetween(today(), prayer.prayerDate); return daysUntil >= 0 && daysUntil <= 1 ? <span style={{ background: T.dustyRoseLight, color: T.dustyRose, borderRadius: 20, padding: "2px 10px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>📅 {daysUntil === 0 ? "Today!" : "Tomorrow!"}</span> : null; })()}
+            {Boolean(prayer.prayerDate) && !isAnswered && (() => { const daysUntil = daysBetween(today(), prayer.prayerDate); return daysUntil >= 0 && daysUntil <= 1 ? <span style={{ background: T.dustyRoseLight, color: T.dustyRose, borderRadius: 20, padding: "2px 10px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>📅 {daysUntil === 0 ? "Today!" : "Tomorrow!"}</span> : null; })()}
           </div>
           {prayer.note && <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, marginBottom: 12, lineHeight: 1.6 }}>{prayer.note}</p>}
           {isAnswered && prayer.answeredNote && (
