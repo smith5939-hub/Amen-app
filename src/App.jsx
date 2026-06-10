@@ -1930,8 +1930,9 @@ export default function App() {
       <FontLink />
       <ToastProvider>
         <div style={{ minHeight: "100vh", background: T.cream }}>
-          <div style={{ position: "sticky", top: 0, zIndex: 90, background: T.cream, textAlign: "center", padding: "14px 0 10px", borderBottom: `1px solid ${T.parchment}` }}>
-<span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18, fontWeight: 600, letterSpacing: 1 }}>
+          <div style={{ position: "sticky", top: 0, zIndex: 90, background: T.cream, padding: "12px 20px 10px", borderBottom: `1px solid ${T.parchment}`, display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 480, margin: "0 auto", width: "100%" }}>
+            <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 24, fontWeight: 600, color: T.sageDark, letterSpacing: 3 }}>LIFT</span>
+            <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 0.5 }}>
               <span style={{ color: T.sageDark }}>L</span><span style={{ color: T.inkLight, fontWeight: 300 }}>og </span>
               <span style={{ color: T.sageDark }}>I</span><span style={{ color: T.inkLight, fontWeight: 300 }}>t </span>
               <span style={{ color: T.sageDark }}>F</span><span style={{ color: T.inkLight, fontWeight: 300 }}>or </span>
