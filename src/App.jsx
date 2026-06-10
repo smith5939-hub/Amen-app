@@ -1031,6 +1031,440 @@ function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequest
   );
 }
 
+
+// ── Reflect Tab ───────────────────────────────────────────────────────────────
+const REFLECT_COLORS = {
+  guided:    { border: "#5C8068", bg: "#F0F5F1", icon: "#5C8068", light: "#D4E4D8" },
+  composer:  { border: "#C8A96E", bg: "#FDF6E8", icon: "#C8A96E", light: "#F5EDD8" },
+  journal:   { border: "#5B7FA6", bg: "#EEF3F8", icon: "#5B7FA6", light: "#D6E4F0" },
+  scripture: { border: "#7C6FAB", bg: "#F2EFF8", icon: "#7C6FAB", light: "#E0D9F5" },
+};
+
+const SCRIPTURE_THEMES = ["Peace", "Healing", "Family", "Wisdom", "Provision", "Strength", "Hope", "Trust"];
+
+function ReflectCard({ type, title, subtitle, expanded, onToggle, children }) {
+  const c = REFLECT_COLORS[type];
+  return (
+    <div style={{ background: T.white, borderRadius: 16, marginBottom: 14, boxShadow: "0 1px 8px rgba(0,0,0,0.06)", overflow: "hidden", borderLeft: `4px solid ${c.border}` }}>
+      <button onClick={onToggle} style={{ width: "100%", border: "none", background: "none", padding: "16px 18px", cursor: "pointer", display: "flex", alignItems: "center", gap: 14, textAlign: "left" }}>
+        <div style={{ width: 52, height: 52, borderRadius: "50%", background: c.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <span style={{ fontSize: 22 }}>{type === "guided" ? "🙏" : type === "composer" ? "✏️" : type === "journal" ? "📓" : "📖"}</span>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 600, color: T.ink, lineHeight: 1.2 }}>{title}</div>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, marginTop: 2, lineHeight: 1.4 }}>{subtitle}</div>
+        </div>
+        <span style={{ color: T.inkLight, fontSize: 16, flexShrink: 0 }}>{expanded ? "∧" : "›"}</span>
+      </button>
+      {expanded && (
+        <div style={{ padding: "0 18px 20px", borderTop: `1px solid ${c.light}` }}>
+          <div style={{ height: 16 }} />
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GuidedPrayer({ onAddPrayer }) {
+  const [weighing, setWeighing] = useState("");
+  const [prayerFor, setPrayerFor] = useState("");
+  const [asking, setAsking] = useState("");
+  const [generated, setGenerated] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [edited, setEdited] = useState("");
+  const showToast = useToast();
+
+  const curate = async () => {
+    if (!weighing.trim()) return;
+    setLoading(true);
+    try {
+      const prompt = `You are a gentle, faith-filled prayer helper. Based on what someone has shared, write a short, heartfelt personal prayer (3-5 sentences) in first person. Keep it warm, conversational, and sincere — not overly formal or religious-sounding. Do not use placeholder brackets. Write the prayer directly.
+
+What is weighing on them: ${weighing}
+Who is this prayer for: ${prayerFor || "myself"}
+What they are asking God for: ${asking || "guidance and peace"}
+
+Write only the prayer itself, nothing else.`;
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+      const data = await response.json();
+      const text = data.content?.[0]?.text || "";
+      setGenerated(text);
+      setEdited(text);
+    } catch (e) {
+      console.error(e);
+    }
+    setLoading(false);
+  };
+
+  const addToPrayers = async () => {
+    await onAddPrayer({ title: weighing.slice(0, 60), note: edited, categories: ["Spiritual Growth"], isPublic: false, prayerDate: null });
+    showToast("Prayer added to your list 🙏");
+    setGenerated(""); setEdited(""); setWeighing(""); setPrayerFor(""); setAsking("");
+  };
+
+  return (
+    <div>
+      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ color: REFLECT_COLORS.guided.border }}>✦</span> Answer a few questions and we'll help shape your heart into a prayer.
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+          <span style={{ fontSize: 18 }}>🤍</span>
+          <label style={{ ...labelStyle, marginBottom: 0 }}>What's weighing on you today?</label>
+        </div>
+        <input style={inputStyle} placeholder="Share what's on your heart..." value={weighing} onChange={e => setWeighing(e.target.value)} />
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+          <span style={{ fontSize: 18 }}>👥</span>
+          <label style={{ ...labelStyle, marginBottom: 0 }}>Who is this prayer for?</label>
+        </div>
+        <input style={inputStyle} placeholder="Name a person or group..." value={prayerFor} onChange={e => setPrayerFor(e.target.value)} />
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+          <span style={{ fontSize: 18 }}>✝️</span>
+          <label style={{ ...labelStyle, marginBottom: 0 }}>What are you asking God for in this?</label>
+        </div>
+        <input style={inputStyle} placeholder="Share your request or hope..." value={asking} onChange={e => setAsking(e.target.value)} />
+      </div>
+      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, textAlign: "center", marginBottom: 14, fontStyle: "italic" }}>
+        We'll help shape this into a prayer you can add to Prayers.
+      </div>
+      {!generated && (
+        <Btn style={{ width: "100%", justifyContent: "center" }} onClick={curate} disabled={loading || !weighing.trim()}>
+          {loading ? "Shaping your prayer..." : "Curate Prayer"}
+        </Btn>
+      )}
+      {generated && (
+        <div>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: REFLECT_COLORS.guided.border, fontWeight: 500, marginBottom: 8 }}>Your prayer — feel free to edit</div>
+          <textarea style={{ ...inputStyle, height: 140, resize: "none", fontFamily: "'Cormorant Garamond', serif", fontSize: 16, lineHeight: 1.7 }} value={edited} onChange={e => setEdited(e.target.value)} />
+          <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+            <Btn style={{ flex: 1, justifyContent: "center" }} onClick={addToPrayers}>Add to Prayers</Btn>
+            <Btn variant="ghost" onClick={() => { setGenerated(""); setEdited(""); }}>Start over</Btn>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PrayerComposer({ prayers, onAddPrayer, onSaveJournal }) {
+  const [freeText, setFreeText] = useState("");
+  const [selectedPrayer, setSelectedPrayer] = useState("");
+  const [composed, setComposed] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [edited, setEdited] = useState("");
+  const showToast = useToast();
+  const activePrayers = prayers.filter(p => p.status === "active" && !p.fromFriend);
+
+  const compose = async () => {
+    if (!freeText.trim() && !selectedPrayer) return;
+    setLoading(true);
+    try {
+      const prayerContext = selectedPrayer ? activePrayers.find(p => p.id === selectedPrayer) : null;
+      const prompt = `You are a thoughtful, faith-filled writing companion. Help turn what someone has shared into a personal, polished prayer. Write in first person, 4-6 sentences. Keep it genuine, warm, and spiritually grounded. Do not use placeholder brackets or generic phrases. Write the prayer directly.
+
+${freeText ? `What's on their heart: ${freeText}` : ""}
+${prayerContext ? `Existing prayer context — Title: ${prayerContext.title}${prayerContext.note ? `, Notes: ${prayerContext.note}` : ""}` : ""}
+
+Write only the prayer itself.`;
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+      const data = await response.json();
+      const text = data.content?.[0]?.text || "";
+      setComposed(text);
+      setEdited(text);
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  };
+
+  const addToPrayers = async () => {
+    const title = freeText.slice(0, 60) || "Composed Prayer";
+    await onAddPrayer({ title, note: edited, categories: ["Spiritual Growth"], isPublic: false, prayerDate: null });
+    showToast("Prayer added 🙏");
+    setFreeText(""); setSelectedPrayer(""); setComposed(""); setEdited("");
+  };
+
+  const saveJournal = async () => {
+    await onSaveJournal({ text: edited, type: "composer", title: freeText.slice(0, 60) || "Composed Prayer" });
+    showToast("Saved to journal 📓");
+    setFreeText(""); setSelectedPrayer(""); setComposed(""); setEdited("");
+  };
+
+  return (
+    <div>
+      <div style={{ marginBottom: 14 }}>
+        <label style={labelStyle}>What's on your heart today?</label>
+        <textarea style={{ ...inputStyle, height: 90, resize: "none" }} placeholder="Describe a burden, situation, or moment..." value={freeText} onChange={e => setFreeText(e.target.value)} />
+      </div>
+      {activePrayers.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <label style={labelStyle}>Or pray from your list</label>
+          <select style={{ ...inputStyle, appearance: "none" }} value={selectedPrayer} onChange={e => setSelectedPrayer(e.target.value)}>
+            <option value="">Choose a prayer...</option>
+            {activePrayers.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+          </select>
+        </div>
+      )}
+      {!composed && (
+        <Btn style={{ width: "100%", justifyContent: "center" }} onClick={compose} disabled={loading || (!freeText.trim() && !selectedPrayer)}>
+          {loading ? "Composing..." : "Compose My Prayer"}
+        </Btn>
+      )}
+      {composed && (
+        <div>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: REFLECT_COLORS.composer.border, fontWeight: 500, marginBottom: 8 }}>Your composed prayer — edit freely</div>
+          <textarea style={{ ...inputStyle, height: 160, resize: "none", fontFamily: "'Cormorant Garamond', serif", fontSize: 16, lineHeight: 1.7 }} value={edited} onChange={e => setEdited(e.target.value)} />
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+            <Btn small style={{ flex: 1, justifyContent: "center" }} onClick={addToPrayers}>Add to Prayers</Btn>
+            <Btn small variant="secondary" onClick={saveJournal}>Save to Journal</Btn>
+            <Btn small variant="ghost" onClick={compose}>Try Again</Btn>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PrayerJournal({ prayers, onSaveJournal }) {
+  const showToast = useToast();
+  const [text, setText] = useState("");
+  const [linked, setLinked] = useState([]);
+  const activePrayers = prayers.filter(p => p.status === "active" && !p.fromFriend).slice(0, 8);
+  const PROMPT_CHIPS = ["What am I feeling?", "What am I asking God for?", "What do I want to remember?"];
+  const [shownChips, setShownChips] = useState(PROMPT_CHIPS);
+
+  const handleTextChange = (val) => {
+    setText(val);
+    const lower = val.toLowerCase();
+    const remaining = PROMPT_CHIPS.filter(c => {
+      if (c.includes("feeling") && lower.includes("feel")) return false;
+      if (c.includes("asking") && lower.includes("ask")) return false;
+      if (c.includes("remember") && lower.includes("remember")) return false;
+      return true;
+    });
+    setShownChips(remaining);
+  };
+
+  const toggleLinked = (id) => setLinked(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
+  const save = async () => {
+    if (!text.trim()) return;
+    const linkedPrayers = prayers.filter(p => linked.includes(p.id)).map(p => ({ id: p.id, title: p.title }));
+    await onSaveJournal({ text, type: "journal", title: text.slice(0, 50), linkedPrayers });
+    showToast("Saved to journal 📓");
+    setText(""); setLinked([]); setShownChips(PROMPT_CHIPS);
+  };
+
+  const addToPrayers = async () => {
+    if (!text.trim()) return;
+    showToast("Feature coming soon");
+  };
+
+  return (
+    <div>
+      {activePrayers.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: REFLECT_COLORS.journal.border, fontWeight: 500, marginBottom: 8 }}>From your prayers</div>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, marginBottom: 8 }}>Pull in items from your prayer list as you write.</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {activePrayers.map(p => {
+              const on = linked.includes(p.id);
+              return (
+                <button key={p.id} onClick={() => toggleLinked(p.id)} style={{ border: `1.5px solid ${on ? REFLECT_COLORS.journal.border : T.parchment}`, background: on ? REFLECT_COLORS.journal.light : "transparent", borderRadius: 20, padding: "5px 12px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", color: on ? REFLECT_COLORS.journal.border : T.inkLight, display: "flex", alignItems: "center", gap: 6 }}>
+                  {on && <span style={{ fontSize: 10 }}>✓</span>}{p.title.slice(0, 20)}{p.title.length > 20 ? "..." : ""}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: REFLECT_COLORS.journal.border, fontWeight: 500, marginBottom: 4 }}>Today's reflection</div>
+      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, marginBottom: 8 }}>Write freely. There's no right or wrong way to pray.</div>
+      <textarea
+        style={{ ...inputStyle, height: 180, resize: "none", fontFamily: "'Cormorant Garamond', serif", fontSize: 16, lineHeight: 1.8, marginBottom: 8 }}
+        placeholder="Lord, I'm feeling..."
+        value={text}
+        onChange={e => handleTextChange(e.target.value)}
+      />
+      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, textAlign: "right", marginBottom: 10 }}>{text.length}/2000</div>
+      {shownChips.length > 0 && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+          {shownChips.map(chip => (
+            <button key={chip} onClick={() => handleTextChange(text + (text ? " " : "") + chip.toLowerCase().replace("?", "") + ": ")} style={{ border: `1px solid ${T.parchment}`, background: "transparent", borderRadius: 20, padding: "5px 12px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", color: T.inkLight }}>
+              {chip}
+            </button>
+          ))}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 10 }}>
+        <Btn style={{ flex: 1, justifyContent: "center" }} onClick={save} disabled={!text.trim()}>Save to Journal</Btn>
+        <Btn variant="ghost" onClick={addToPrayers}>Add to Prayers</Btn>
+      </div>
+    </div>
+  );
+}
+
+function ScriptureThemes({ prayers }) {
+  const [selectedTheme, setSelectedTheme] = useState("Peace");
+  const [verses, setVerses] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const prayerContext = prayers.filter(p => p.status === "active" && !p.fromFriend).slice(0, 5).map(p => p.title).join(", ");
+
+  const fetchVerses = async (theme) => {
+    setLoading(true);
+    setVerses([]);
+    try {
+      const prompt = `You are a thoughtful Bible scholar. Select 2 Bible verses about the theme of "${theme}" that would resonate with someone whose current prayers involve: ${prayerContext || "everyday life challenges"}.
+
+Return ONLY a JSON array with exactly 2 objects, no markdown, no explanation:
+[{"verse": "the verse text", "reference": "Book Chapter:Verse", "translation": "NIV"}, {"verse": "...", "reference": "...", "translation": "NIV"}]`;
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+      const data = await response.json();
+      const text = data.content?.[0]?.text || "[]";
+      const clean = text.replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(clean);
+      setVerses(parsed);
+    } catch (e) { console.error(e); setVerses([]); }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchVerses(selectedTheme); }, []);
+
+  return (
+    <div>
+      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ color: REFLECT_COLORS.scripture.border }}>✦</span> Scripture for what's on your heart
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        {SCRIPTURE_THEMES.map(t => (
+          <button key={t} onClick={() => { setSelectedTheme(t); fetchVerses(t); }} style={{ border: `1.5px solid ${selectedTheme === t ? REFLECT_COLORS.scripture.border : T.parchment}`, background: selectedTheme === t ? REFLECT_COLORS.scripture.light : "transparent", borderRadius: 20, padding: "5px 14px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", color: selectedTheme === t ? REFLECT_COLORS.scripture.border : T.inkLight, fontWeight: selectedTheme === t ? 500 : 400 }}>{t}</button>
+        ))}
+      </div>
+      {loading && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, textAlign: "center", padding: "20px 0" }}>Finding verses for you...</div>}
+      {!loading && verses.length > 0 && (
+        <div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+            {verses.map((v, i) => (
+              <div key={i} style={{ background: REFLECT_COLORS.scripture.bg, borderRadius: 12, padding: "14px 12px" }}>
+                <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 15, color: T.ink, lineHeight: 1.6, marginBottom: 8 }}>"{v.verse}"</div>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: REFLECT_COLORS.scripture.border, fontWeight: 500 }}>{v.reference} | {v.translation}</div>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => fetchVerses(selectedTheme)} style={{ border: "none", background: "none", color: REFLECT_COLORS.scripture.border, fontFamily: "'DM Sans', sans-serif", fontSize: 13, cursor: "pointer", fontWeight: 500, padding: 0 }}>Show another verse →</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Reflect({ prayers, user, addPrayer }) {
+  const [expanded, setExpanded] = useState(null);
+  const [journalEntries, setJournalEntries] = useState([]);
+
+  const toggle = (id) => setExpanded(prev => prev === id ? null : id);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "journalEntries"), where("userId", "==", user.uid));
+    const unsub = onSnapshot(q, snap => {
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setJournalEntries(data);
+    });
+    return unsub;
+  }, [user]);
+
+  const saveJournal = async ({ text, type, title, linkedPrayers }) => {
+    await addDoc(collection(db, "journalEntries"), {
+      userId: user.uid,
+      text,
+      type,
+      title: title || text.slice(0, 50),
+      linkedPrayers: linkedPrayers || [],
+      createdAt: new Date().toISOString(),
+    });
+  };
+
+  const typeIcon = (type) => type === "guided" ? "🙏" : type === "composer" ? "✏️" : "📓";
+
+  const fmtFull = (d) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+  return (
+    <div style={tabContent}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={pageTitle}>Reflect</div>
+        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>Write, listen, and rest in the Word.</div>
+      </div>
+
+      <ReflectCard type="guided" title="Guided Prayer" subtitle="Gentle prompts to help shape what's on your heart." expanded={expanded === "guided"} onToggle={() => toggle("guided")}>
+        <GuidedPrayer onAddPrayer={addPrayer} />
+      </ReflectCard>
+
+      <ReflectCard type="composer" title="Prayer Composer" subtitle="Turn a burden or situation into a personal prayer." expanded={expanded === "composer"} onToggle={() => toggle("composer")}>
+        <PrayerComposer prayers={prayers} onAddPrayer={addPrayer} onSaveJournal={saveJournal} />
+      </ReflectCard>
+
+      <ReflectCard type="journal" title="Prayer Journal" subtitle="Write freely and pray through your list." expanded={expanded === "journal"} onToggle={() => toggle("journal")}>
+        <PrayerJournal prayers={prayers} onSaveJournal={saveJournal} />
+      </ReflectCard>
+
+      <ReflectCard type="scripture" title="Scripture & Themes" subtitle="Browse verses by topic and bring the Word into prayer." expanded={expanded === "scripture"} onToggle={() => toggle("scripture")}>
+        <ScriptureThemes prayers={prayers} />
+      </ReflectCard>
+
+      {journalEntries.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: REFLECT_COLORS.guided.border, fontWeight: 600, letterSpacing: 0.5 }}>Recent Reflections</div>
+            <button style={{ border: "none", background: "none", fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: REFLECT_COLORS.guided.border, cursor: "pointer", fontWeight: 500 }}>See all ›</button>
+          </div>
+          {journalEntries.slice(0, 5).map(e => (
+            <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: `1px solid ${T.parchment}` }}>
+              <span style={{ fontSize: 18, flexShrink: 0 }}>{typeIcon(e.type)}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.ink, fontWeight: 500 }}>{e.title}</div>
+              </div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, flexShrink: 0 }}>{fmtFull(e.createdAt)}</div>
+              <span style={{ color: T.inkLight, fontSize: 12 }}>›</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Notifications({ currentUser }) {
   const [notifs, setNotifs] = useState([]);
   useEffect(() => {
@@ -1080,8 +1514,8 @@ function Notifications({ currentUser }) {
 const TABS = [
   { id: "prayers", icon: "🙏", label: "Prayers" },
   { id: "community", icon: "👥", label: "Community" },
+  { id: "reflect", icon: "📖", label: "Reflect" },
   { id: "notifications", icon: "🔔", label: "Notifications" },
-  { id: "dashboard", icon: "✦", label: "Stats" },
   { id: "profile", icon: "☽", label: "Profile" },
 ];
 
@@ -1286,7 +1720,7 @@ export default function App() {
               {tab === "prayers" && <MyPrayers prayers={prayers} addPrayer={addPrayer} updatePrayer={updatePrayer} deletePrayer={deletePrayer} friends={friends} firstName={firstName} defaultPublic={defaultPublic} />}
               {tab === "community" && <Community currentUser={user} friends={friends} myPrayers={prayers} addPrayer={addPrayer} incomingRequests={incomingRequests} onAccept={acceptRequest} onDecline={declineRequest} onSendRequest={sendFriendRequest} />}
               {tab === "notifications" && <Notifications currentUser={user} />}
-              {tab === "dashboard" && <Dashboard prayers={prayers} />}
+              {tab === "reflect" && <Reflect prayers={prayers} user={user} addPrayer={addPrayer} />}
               {tab === "profile" && <Profile prayers={prayers} user={user} defaultPublic={defaultPublic} setDefaultPublic={setDefaultPublic} onSignOut={handleSignOut} />}
             </>
           )}
