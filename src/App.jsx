@@ -1597,13 +1597,8 @@ function PrayerJournal({ prayers, onSaveJournal }) {
     setText(val);
   };
 
-  const toggleLinked = (prayer) => {
-    const alreadyLinked = linked.includes(prayer.id);
-
-    if (alreadyLinked) {
-      setLinked(prev => prev.filter(x => x !== prayer.id));
-      return;
-    }
+  const addLinkedPrayer = (prayer) => {
+    if (linked.includes(prayer.id)) return;
 
     setLinked(prev => [...prev, prayer.id]);
     setText(prev => {
@@ -1634,11 +1629,11 @@ function PrayerJournal({ prayers, onSaveJournal }) {
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: REFLECT_COLORS.journal.border, fontWeight: 500, marginBottom: 8 }}>From your prayers</div>
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, marginBottom: 8 }}>Tap a prayer to link it and add its title to your reflection.</div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {activePrayers.map(p => {
+            {activePrayers.filter(p => !linked.includes(p.id)).map(p => {
               const on = linked.includes(p.id);
               return (
-                <button key={p.id} onClick={() => toggleLinked(p)} style={{ border: `1.5px solid ${on ? REFLECT_COLORS.journal.border : T.parchment}`, background: on ? REFLECT_COLORS.journal.light : "transparent", borderRadius: 20, padding: "5px 12px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", color: on ? REFLECT_COLORS.journal.border : T.inkLight, display: "flex", alignItems: "center", gap: 6 }}>
-                  {on && <span style={{ fontSize: 10 }}>✓</span>}{p.title.slice(0, 20)}{p.title.length > 20 ? "..." : ""}
+                <button key={p.id} onClick={() => addLinkedPrayer(p)} style={{ border: `1.5px solid ${T.parchment}`, background: "transparent", borderRadius: 20, padding: "5px 12px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", color: T.inkLight, display: "flex", alignItems: "center", gap: 6 }}>
+                  {p.title.slice(0, 20)}{p.title.length > 20 ? "..." : ""}
                 </button>
               );
             })}
