@@ -590,6 +590,41 @@ function Toggle({ val, onToggle }) {
   );
 }
 
+function TestimonyModal({ prayer, onClose }) {
+  const cats = Array.isArray(prayer.categories) ? prayer.categories : [prayer.categories].filter(Boolean);
+  const fmtFull = (d) => new Date(d).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
+      <div style={{ background: T.cream, borderRadius: 20, padding: "24px 20px 28px", width: "100%", maxWidth: 480, maxHeight: "calc(100vh - 80px)", overflowY: "auto", boxShadow: "0 12px 36px rgba(0,0,0,0.18)" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 10, minWidth: 0 }}>
+            <span style={{ fontSize: 24, flexShrink: 0 }}>🙌</span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 600, color: T.ink, lineHeight: 1.25, overflowWrap: "break-word" }}>{prayer.title}</div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, marginTop: 4 }}>Answered {fmtFull(prayer.date)}</div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ border: "none", background: "none", fontSize: 20, cursor: "pointer", color: T.inkLight, padding: 4, flexShrink: 0 }}>✕</button>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+          {cats.map(c => <CategoryPill key={c} cat={c} />)}
+          <Badge label="✓ Answered" color={T.sage} />
+        </div>
+        {prayer.answeredNote ? (
+          <div style={{ background: T.answeredBg, borderRadius: 14, padding: "16px 18px" }}>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.sageDark, fontWeight: 500, marginBottom: 8, letterSpacing: 0.5, textTransform: "uppercase" }}>What happened</div>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: T.ink, lineHeight: 1.7 }}>{prayer.answeredNote}</div>
+          </div>
+        ) : (
+          <div style={{ background: T.parchment, borderRadius: 14, padding: "16px 18px", textAlign: "center" }}>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, fontStyle: "italic" }}>No note was left for this testimony.</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) {
   const showToast = useToast();
   const [remindersOn, setRemindersOn] = useState(true);
@@ -599,6 +634,7 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
   const [stats, setStats] = useState({ daysPrayed: 0, streak: 0, totalPrayers: 0, answered: 0, prayedFor: 0, prayedByOthers: 0, encourageSent: 0, encourageReceived: 0, journalEntries: 0 });
   const [testimonies, setTestimonies] = useState([]);
   const [showTestimonies, setShowTestimonies] = useState(false);
+  const [viewTestimony, setViewTestimony] = useState(null);
 
   useEffect(() => {
     if (!user) return;
@@ -768,10 +804,15 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, padding: "12px 0", fontStyle: "italic", textAlign: "center" }}>No answered prayers yet — keep praying!</div>
           )}
           {testimonies.map(p => (
-            <Card key={p.id} style={{ borderLeft: `3px solid ${T.sage}`, marginBottom: 8 }}>
-              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16, fontWeight: 600, color: T.ink, marginBottom: 4 }}>{p.title}</div>
-              {p.answeredNote && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, lineHeight: 1.5 }}>{p.answeredNote}</div>}
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, marginTop: 6 }}>{fmt(p.date)}</div>
+            <Card key={p.id} onClick={() => setViewTestimony(p)} style={{ borderLeft: `3px solid ${T.sage}`, marginBottom: 8, cursor: "pointer" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16, fontWeight: 600, color: T.ink, marginBottom: 4 }}>{p.title}</div>
+                  {p.answeredNote && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{p.answeredNote}</div>}
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, marginTop: 6 }}>{fmt(p.date)}</div>
+                </div>
+                <span style={{ color: T.inkLight, fontSize: 14, flexShrink: 0, marginTop: 2 }}>›</span>
+              </div>
             </Card>
           ))}
         </div>
@@ -779,6 +820,7 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
 
       <Btn variant="ghost" style={{ width: "100%", justifyContent: "center", marginTop: 8, color: T.dustyRose }} onClick={onSignOut}>Sign Out</Btn>
     </div>
+    {viewTestimony && <TestimonyModal prayer={viewTestimony} onClose={() => setViewTestimony(null)} />}
   );
 }
 
