@@ -819,8 +819,8 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
       )}
 
       <Btn variant="ghost" style={{ width: "100%", justifyContent: "center", marginTop: 8, color: T.dustyRose }} onClick={onSignOut}>Sign Out</Btn>
+      {viewTestimony && <TestimonyModal prayer={viewTestimony} onClose={() => setViewTestimony(null)} />}
     </div>
-    {viewTestimony && <TestimonyModal prayer={viewTestimony} onClose={() => setViewTestimony(null)} />}
   );
 }
 
