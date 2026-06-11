@@ -594,7 +594,7 @@ function TestimonyModal({ prayer, onClose }) {
   const cats = Array.isArray(prayer.categories) ? prayer.categories : [prayer.categories].filter(Boolean);
   const fmtFull = (d) => new Date(d).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
       <div style={{ background: T.cream, borderRadius: 20, padding: "24px 20px 28px", width: "100%", maxWidth: 480, maxHeight: "calc(100vh - 80px)", overflowY: "auto", boxShadow: "0 12px 36px rgba(0,0,0,0.18)" }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 10, minWidth: 0 }}>
@@ -804,7 +804,7 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, padding: "12px 0", fontStyle: "italic", textAlign: "center" }}>No answered prayers yet — keep praying!</div>
           )}
           {testimonies.map(p => (
-            <Card key={p.id} onClick={() => setViewTestimony(p)} style={{ borderLeft: `3px solid ${T.sage}`, marginBottom: 8, cursor: "pointer" }}>
+            <Card key={p.id} onClick={(e) => { e.stopPropagation(); setViewTestimony(p); }} style={{ borderLeft: `3px solid ${T.sage}`, marginBottom: 8, cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16, fontWeight: 600, color: T.ink, marginBottom: 4 }}>{p.title}</div>
