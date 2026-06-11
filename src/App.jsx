@@ -787,7 +787,7 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
         ))}
       </div>
 
-      <button onClick={() => setShowTestimonies(!showTestimonies)} style={{ width: "100%", border: "none", background: T.answeredBg, borderRadius: 14, padding: "14px 18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+      <div onClick={() => setShowTestimonies(!showTestimonies)} style={{ width: "100%", background: T.answeredBg, borderRadius: 14, padding: "14px 18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 20 }}>🙌</span>
           <div style={{ textAlign: "left" }}>
