@@ -69,6 +69,14 @@ const fmt = (d) => new Date(d).toLocaleDateString("en-US", { month: "short", day
 const daysBetween = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
 const today = () => new Date().toISOString().split("T")[0];
 
+const maskEmail = (email) => {
+  if (!email) return "";
+  const [local, domain] = email.split("@");
+  if (!domain) return email;
+  const visible = local.slice(0, 2);
+  return `${visible}***@${domain}`;
+};
+
 const SORT_OPTIONS = [
   { id: "newest", label: "Newest" },
   { id: "oldest", label: "Oldest" },
@@ -542,20 +550,19 @@ function Friends({ currentUser, friends, incomingRequests, onAccept, onDecline, 
     setSearchResult(null);
     setRequestSent(false);
     try {
-      const q = query(collection(db, "users"), where("email", "==", search.trim().toLowerCase()));
-      const snap = await getDocs(q);
-      if (snap.empty) {
-        setSearchResult({ notFound: true });
-      } else {
-        const userData = { uid: snap.docs[0].id, ...snap.docs[0].data() };
-        if (userData.uid === currentUser.uid) {
-          setSearchResult({ isSelf: true });
-        } else if (friends.find(f => f.uid === userData.uid)) {
-          setSearchResult({ alreadyFriend: true, user: userData });
-        } else {
-          setSearchResult({ user: userData });
-        }
-      }
+      const term = search.trim().toLowerCase();
+      const allUsersSnap = await getDocs(collection(db, "users"));
+      const matches = allUsersSnap.docs
+        .map(d => ({ uid: d.id, ...d.data() }))
+        .filter(u => {
+          const name = (u.displayName || "").toLowerCase();
+          const email = (u.email || "").toLowerCase();
+          return name.includes(term) || email.includes(term);
+        })
+        .filter(u => u.uid !== currentUser.uid)
+        .slice(0, 5);
+      if (matches.length === 0) { setSearchResult({ notFound: true }); }
+      else { setSearchResult({ matches }); }
     } catch (e) {
       setSearchResult({ error: true });
     }
@@ -596,7 +603,7 @@ function Friends({ currentUser, friends, incomingRequests, onAccept, onDecline, 
 
       <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10 }}>Find a Friend</div>
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <input style={{ ...inputStyle, marginBottom: 0, flex: 1 }} placeholder="Search by email address..." value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleSearch(); }} />
+        <input style={{ ...inputStyle, marginBottom: 0, flex: 1 }} placeholder="Search by name or email..." value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleSearch(); }} />
         <Btn small variant="secondary" onClick={handleSearch} disabled={searching} style={{ flexShrink: 0 }}>{searching ? "..." : "Search"}</Btn>
       </div>
 
@@ -604,7 +611,7 @@ function Friends({ currentUser, friends, incomingRequests, onAccept, onDecline, 
         <Card style={{ marginBottom: 20 }}>
           {searchResult.notFound && (
             <div>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, marginBottom: 12 }}>Not on LIFT yet.</div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, marginBottom: 12 }}>No one found on LIFT with that name or email.</div>
               <Btn small variant="secondary" onClick={() => {
                 const subject = encodeURIComponent("Join me on LIFT");
                 const body = encodeURIComponent(`Hey! I've been using LIFT to track my prayers and I'd love to pray together. Join me here: https://amen-app-two.vercel.app`);
@@ -612,19 +619,23 @@ function Friends({ currentUser, friends, incomingRequests, onAccept, onDecline, 
               }}>✉️ Send Invite</Btn>
             </div>
           )}
-          {searchResult.isSelf && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight }}>That's you! 😄</div>}
-          {searchResult.alreadyFriend && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.sageDark }}>You're already friends with {searchResult.user.displayName}! 🙏</div>}
           {searchResult.error && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.dustyRose }}>Something went wrong. Try again.</div>}
-          {searchResult.user && !searchResult.alreadyFriend && !searchResult.isSelf && (
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <Avatar initials={(searchResult.user.displayName || "?").split(" ").map(n => n[0]).join("").slice(0, 2)} photoURL={searchResult.user.photoURL} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: T.ink }}>{searchResult.user.displayName}</div>
-                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{searchResult.user.email}</div>
+          {searchResult.matches && searchResult.matches.map(u => {
+            const alreadyFriend = friends.find(f => f.uid === u.uid);
+            return (
+              <div key={u.uid} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                <Avatar initials={(u.displayName || "?").split(" ").map(n => n[0]).join("").slice(0, 2)} photoURL={u.photoURL} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: T.ink }}>{u.displayName}</div>
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{maskEmail(u.email)}</div>
+                </div>
+                {alreadyFriend
+                  ? <Badge label="Friend" color={T.sage} />
+                  : <Btn small variant={requestSent ? "secondary" : "primary"} onClick={() => { onSendRequest(u); showToast("Friend request sent 🙏"); }} disabled={requestSent}>{requestSent ? "Sent ✓" : "Connect"}</Btn>
+                }
               </div>
-              <Btn small variant={requestSent ? "secondary" : "primary"} onClick={handleSend} disabled={requestSent}>{requestSent ? "Sent ✓" : "Connect"}</Btn>
-            </div>
-          )}
+            );
+          })}
         </Card>
       )}
 
@@ -1048,20 +1059,19 @@ function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequest
     setSearchResult(null);
     setRequestSent(false);
     try {
-      const emailQ = query(collection(db, "users"), where("email", "==", search.trim().toLowerCase()));
-      const emailSnap = await getDocs(emailQ);
-      let userData = null;
-      if (!emailSnap.empty) {
-        userData = { uid: emailSnap.docs[0].id, ...emailSnap.docs[0].data() };
-      } else {
-        const nameQ = query(collection(db, "users"), where("displayName", "==", search.trim()));
-        const nameSnap = await getDocs(nameQ);
-        if (!nameSnap.empty) userData = { uid: nameSnap.docs[0].id, ...nameSnap.docs[0].data() };
-      }
-      if (!userData) { setSearchResult({ notFound: true }); }
-      else if (userData.uid === currentUser.uid) { setSearchResult({ isSelf: true }); }
-      else if (friends.find(f => f.uid === userData.uid)) { setSearchResult({ alreadyFriend: true, user: userData }); }
-      else { setSearchResult({ user: userData }); }
+      const term = search.trim().toLowerCase();
+      const allUsersSnap = await getDocs(collection(db, "users"));
+      const matches = allUsersSnap.docs
+        .map(d => ({ uid: d.id, ...d.data() }))
+        .filter(u => {
+          const name = (u.displayName || "").toLowerCase();
+          const email = (u.email || "").toLowerCase();
+          return name.includes(term) || email.includes(term);
+        })
+        .filter(u => u.uid !== currentUser.uid)
+        .slice(0, 5);
+      if (matches.length === 0) { setSearchResult({ notFound: true }); }
+      else { setSearchResult({ matches }); }
     } catch (e) { setSearchResult({ error: true }); }
     setSearching(false);
   };
@@ -1122,7 +1132,7 @@ function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequest
               <div style={{ background: T.cream, borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
                 {searchResult.notFound && (
                   <div>
-                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, marginBottom: 10 }}>Not on LIFT yet.</div>
+                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, marginBottom: 10 }}>No one found on LIFT with that name or email.</div>
                     <Btn small variant="secondary" onClick={() => {
                       const subject = encodeURIComponent("Join me on LIFT");
                       const body = encodeURIComponent(`Hey! I've been using LIFT to track my prayers and I'd love to pray together. Join me here: https://amen-app-two.vercel.app`);
@@ -1130,19 +1140,23 @@ function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequest
                     }}>✉️ Send Invite</Btn>
                   </div>
                 )}
-                {searchResult.isSelf && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight }}>That's you! 😄</div>}
-                {searchResult.alreadyFriend && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.sageDark }}>Already friends! 🙏</div>}
                 {searchResult.error && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.dustyRose }}>Something went wrong. Try again.</div>}
-                {searchResult.user && !searchResult.alreadyFriend && !searchResult.isSelf && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <Avatar initials={(searchResult.user.displayName || "?").split(" ").map(n => n[0]).join("").slice(0, 2)} photoURL={searchResult.user.photoURL} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: T.ink }}>{searchResult.user.displayName}</div>
-                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{searchResult.user.email}</div>
+                {searchResult.matches && searchResult.matches.map(u => {
+                  const alreadyFriend = friends.find(f => f.uid === u.uid);
+                  return (
+                    <div key={u.uid} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                      <Avatar initials={(u.displayName || "?").split(" ").map(n => n[0]).join("").slice(0, 2)} photoURL={u.photoURL} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 14, color: T.ink }}>{u.displayName}</div>
+                        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{maskEmail(u.email)}</div>
+                      </div>
+                      {alreadyFriend
+                        ? <Badge label="Friend" color={T.sage} />
+                        : <Btn small variant="primary" onClick={() => { onSendRequest(u); showToast("Friend request sent 🙏"); }}>Connect</Btn>
+                      }
                     </div>
-                    <Btn small variant={requestSent ? "secondary" : "primary"} onClick={handleSend} disabled={requestSent}>{requestSent ? "Sent ✓" : "Connect"}</Btn>
-                  </div>
-                )}
+                  );
+                })}
               </div>
             )}
 
