@@ -804,7 +804,7 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, padding: "12px 0", fontStyle: "italic", textAlign: "center" }}>No answered prayers yet — keep praying!</div>
           )}
           {testimonies.map(p => (
-            <Card key={p.id} onClick={(e) => { e.stopPropagation(); setViewTestimony(p); }} style={{ borderLeft: `3px solid ${T.sage}`, marginBottom: 8, cursor: "pointer" }}>
+            <Card key={p.id} onClick={(e) => { e.stopPropagation(); console.log("testimony clicked", p.title); setViewTestimony(p); }} style={{ borderLeft: `3px solid ${T.sage}`, marginBottom: 8, cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16, fontWeight: 600, color: T.ink, marginBottom: 4 }}>{p.title}</div>
