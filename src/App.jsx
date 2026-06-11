@@ -749,6 +749,13 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
       </div>
 
       <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10 }}>General</div>
+      <Card style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 14, color: T.ink }}>Send Feedback</div>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>Help us improve LIFT</div>
+        </div>
+        <Btn small variant="secondary" onClick={() => window.open('mailto:logitfortransformation@gmail.com?subject=LIFT Feedback')}>✉️ Feedback</Btn>
+      </Card>
       <Card style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 14, color: T.ink }}>Default to private</div>
@@ -1896,7 +1903,7 @@ export default function App() {
   const [prayers, setPrayers] = useState([]);
   const [friends, setFriends] = useState([]);
   const [incomingRequests, setIncomingRequests] = useState([]);
-  const [defaultPublic, setDefaultPublic] = useState(true);
+  const [defaultPublic, setDefaultPublic] = useState(false);
   const [loadingPrayers, setLoadingPrayers] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
 
