@@ -590,6 +590,39 @@ function Toggle({ val, onToggle }) {
   );
 }
 
+function TestimonyCard({ prayer }) {
+  const [open, setOpen] = useState(false);
+  const cats = Array.isArray(prayer.categories) ? prayer.categories : [prayer.categories].filter(Boolean);
+  return (
+    <Card style={{ borderLeft: `3px solid ${T.sage}`, marginBottom: 8 }}>
+      <div onClick={() => setOpen(!open)} style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, cursor: "pointer" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16, fontWeight: 600, color: T.ink, marginBottom: 4 }}>{prayer.title}</div>
+          {!open && prayer.answeredNote && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{prayer.answeredNote}</div>}
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, marginTop: 4 }}>{fmt(prayer.date)}</div>
+        </div>
+        <span style={{ color: T.inkLight, fontSize: 14, flexShrink: 0, marginTop: 2 }}>{open ? "▲" : "▾"}</span>
+      </div>
+      {open && (
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.parchment}` }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+            {cats.map(c => <CategoryPill key={c} cat={c} />)}
+            <Badge label="✓ Answered" color={T.sage} />
+          </div>
+          {prayer.answeredNote ? (
+            <div style={{ background: T.answeredBg, borderRadius: 12, padding: "12px 14px" }}>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.sageDark, fontWeight: 500, marginBottom: 6, letterSpacing: 0.5, textTransform: "uppercase" }}>What happened</div>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 17, color: T.ink, lineHeight: 1.7 }}>{prayer.answeredNote}</div>
+            </div>
+          ) : (
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, fontStyle: "italic" }}>No note was left for this testimony.</div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function TestimonyModal({ prayer, onClose }) {
   const cats = Array.isArray(prayer.categories) ? prayer.categories : [prayer.categories].filter(Boolean);
   const fmtFull = (d) => new Date(d).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
@@ -804,16 +837,7 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, padding: "12px 0", fontStyle: "italic", textAlign: "center" }}>No answered prayers yet — keep praying!</div>
           )}
           {testimonies.map(p => (
-            <Card key={p.id} onClick={() => setViewTestimony(p)} style={{ borderLeft: `3px solid ${T.sage}`, marginBottom: 8, cursor: "pointer" }}>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16, fontWeight: 600, color: T.ink, marginBottom: 4 }}>{p.title}</div>
-                  {p.answeredNote && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{p.answeredNote}</div>}
-                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, marginTop: 6 }}>{fmt(p.date)}</div>
-                </div>
-                <span style={{ color: T.inkLight, fontSize: 14, flexShrink: 0, marginTop: 2 }}>›</span>
-              </div>
-            </Card>
+            <TestimonyCard key={p.id} prayer={p} />
           ))}
         </div>
       )}
