@@ -1530,7 +1530,7 @@ function PrayerJournal({ prayers, onSaveJournal }) {
               return (
                 <button key={p.id} onClick={() => addLinkedPrayer(p)} style={{ border: `1.5px solid ${T.parchment}`, background: "transparent", borderRadius: 20, padding: "5px 12px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", color: T.inkLight, display: "flex", alignItems: "center", gap: 6 }}>
                   {p.title.slice(0, 20)}{p.title.length > 20 ? "..." : ""}
-                </div>
+                </button>
               );
             })}
           </div>
