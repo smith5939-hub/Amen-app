@@ -458,84 +458,7 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
   );
 }
 
-function Feed({ friends, myPrayers, addPrayer, currentUser }) {
-  const showToast = useToast();
-  const [prayingIds, setPrayingIds] = useState([]);
-  const togglePraying = async (prayer, friend) => {
-    const id = prayer.id;
-    const adding = !prayingIds.includes(id);
-    setPrayingIds(prev => adding ? [...prev, id] : prev.filter(x => x !== id));
-    if (adding) {
-      showToast("They'll know you're praying 🙏");
-      await addDoc(collection(db, "prayingRecords"), {
-        prayerOwnerId: prayer.userId,
-        prayerTitle: prayer.title,
-        prayingUserId: currentUser.uid,
-        prayerName: currentUser.displayName || "A friend",
-        prayerId: id,
-        createdAt: new Date().toISOString(),
-      });
-    }
-  };
-  const addedKeys = myPrayers.filter(p => p.fromFriend).map(p => p.sourceKey);
-  const keyFor = (friend, p) => `${friend.uid}-${p.id}`;
-  const addToList = async (friend, prayer) => {
-    const key = keyFor(friend, prayer);
-    if (addedKeys.includes(key)) { showToast("Already on your list"); return; }
-    await addPrayer({ ...prayer, sourceKey: key, isPublic: false, status: "active", date: today(), answeredNote: null, praying: 0, fromFriend: true, ownerName: friend.displayName || "Friend" });
-    showToast("Added to your list");
-  };
-  const addAll = async (friend) => {
-    const toAdd = friend.prayers.filter(p => p.status === "active" && !addedKeys.includes(keyFor(friend, p)));
-    if (!toAdd.length) { showToast("All already on your list"); return; }
-    for (const prayer of toAdd) {
-      await addPrayer({ ...prayer, sourceKey: keyFor(friend, prayer), isPublic: false, status: "active", date: today(), answeredNote: null, praying: 0, fromFriend: true, ownerName: friend.displayName || "Friend" });
-    }
-    showToast(`Added ${toAdd.length} prayers`);
-  };
 
-  if (friends.length === 0) {
-    return (
-      <div style={tabContent}>
-        <div style={{ marginBottom: 20 }}>
-          <div style={pageTitle}>Friends' Prayers</div>
-          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>Stand with your community</div>
-        </div>
-        <div style={{ textAlign: "center", padding: "40px 20px" }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>👥</div>
-          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: T.ink, marginBottom: 8 }}>No friends yet</div>
-          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, lineHeight: 1.6 }}>Connect with friends in the Friends tab to see their prayer requests here.</div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div style={tabContent}>
-      <div style={{ marginBottom: 20 }}>
-        <div style={pageTitle}>Friends' Prayers</div>
-        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>Stand with your community</div>
-      </div>
-      {friends.map(friend => (
-        <div key={friend.uid} style={{ marginBottom: 24 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-            <Avatar initials={(friend.displayName || "?").split(" ").map(n => n[0]).join("").slice(0, 2)} photoURL={friend.photoURL} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: T.ink }}>{friend.displayName || "Friend"}</div>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{friend.prayers?.length || 0} shared prayer{(friend.prayers?.length || 0) !== 1 ? "s" : ""}</div>
-            </div>
-          </div>
-          {(friend.prayers || []).map(p => (
-            <PrayerCard key={p.id} prayer={p} mine={false} myPrayingIds={prayingIds} onTogglePraying={(p) => togglePraying(p, friend)} />
-          ))}
-          {(!friend.prayers || friend.prayers.length === 0) && (
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, padding: "10px 0", fontStyle: "italic" }}>No public prayers shared yet.</div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
 
 function Friends({ currentUser, friends, incomingRequests, onAccept, onDecline, onSendRequest }) {
   const showToast = useToast();
@@ -968,23 +891,6 @@ function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequest
     const id = prayer.id;
     if (prayingIds.includes(id)) return;
     setEncourageTarget(prayer);
-  };
-
-  const addedKeys = myPrayers.filter(p => p.fromFriend).map(p => p.sourceKey);
-  const keyFor = (friend, p) => `${friend.uid}-${p.id}`;
-  const addToList = async (friend, prayer) => {
-    const key = keyFor(friend, prayer);
-    if (addedKeys.includes(key)) { showToast("Already on your list"); return; }
-    await addPrayer({ ...prayer, sourceKey: key, isPublic: false, status: "active", date: today(), answeredNote: null, praying: 0, fromFriend: true, ownerName: friend.displayName || "Friend" });
-    showToast("Added to your list");
-  };
-  const addAll = async (friend) => {
-    const toAdd = friend.prayers.filter(p => p.status === "active" && !addedKeys.includes(keyFor(friend, p)));
-    if (!toAdd.length) { showToast("All already on your list"); return; }
-    for (const prayer of toAdd) {
-      await addPrayer({ ...prayer, sourceKey: keyFor(friend, prayer), isPublic: false, status: "active", date: today(), answeredNote: null, praying: 0, fromFriend: true, ownerName: friend.displayName || "Friend" });
-    }
-    showToast(`Added ${toAdd.length} prayers`);
   };
 
   const handleSearch = async () => {
