@@ -657,73 +657,7 @@ function Friends({ currentUser, friends, incomingRequests, onAccept, onDecline, 
   );
 }
 
-function Dashboard({ prayers }) {
-  const catsOf = (p) => Array.isArray(p.categories) ? p.categories : [p.categories].filter(Boolean);
-  const active = prayers.filter(p => p.status === "active").length;
-  const answered = prayers.filter(p => p.status === "answered").length;
-  const total = prayers.length;
-  const pct = total ? Math.round((answered / total) * 100) : 0;
-  const streak = 14;
-  const catCounts = Object.keys(CAT_COLORS).map(cat => ({ cat, count: prayers.filter(p => catsOf(p).includes(cat)).length })).filter(x => x.count > 0).sort((a, b) => b.count - a.count);
-  const maxCat = catCounts[0]?.count || 1;
-  const recentAnswered = prayers.filter(p => p.status === "answered").slice(0, 3);
-  return (
-    <div style={tabContent}>
-      <div style={{ marginBottom: 20 }}>
-        <div style={pageTitle}>Dashboard</div>
-        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>Your prayer life at a glance</div>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
-        {[{ label: "Active", val: active, color: T.gold, bg: T.goldLight }, { label: "Answered", val: answered, color: T.sage, bg: T.answeredBg }, { label: "Streak", val: `${streak}d`, color: T.dustyRose, bg: T.dustyRoseLight }].map(k => (
-          <div key={k.label} style={{ background: k.bg, borderRadius: 14, padding: "14px 12px", textAlign: "center" }}>
-            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 28, fontWeight: 600, color: k.color }}>{k.val}</div>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: k.color, fontWeight: 500 }}>{k.label}</div>
-          </div>
-        ))}
-      </div>
-      <Card>
-        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, marginBottom: 10 }}>Answer Rate</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ flex: 1, height: 8, background: T.parchment, borderRadius: 4, overflow: "hidden" }}>
-            <div style={{ width: `${pct}%`, height: "100%", background: T.sage, borderRadius: 4 }} />
-          </div>
-          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 600, color: T.sageDark, minWidth: 40 }}>{pct}%</div>
-        </div>
-        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, marginTop: 6 }}>{answered} of {total} prayers answered</div>
-      </Card>
-      {catCounts.length > 0 && (
-        <Card>
-          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, marginBottom: 12 }}>By Category</div>
-          {catCounts.map(({ cat, count }) => {
-            const c = catColor(cat);
-            return (
-              <div key={cat} style={{ marginBottom: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                  <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.ink }}>{cat}</span>
-                  <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>{count}</span>
-                </div>
-                <div style={{ height: 6, background: T.parchment, borderRadius: 3, overflow: "hidden" }}>
-                  <div style={{ width: `${(count / maxCat) * 100}%`, height: "100%", background: c.text, borderRadius: 3 }} />
-                </div>
-              </div>
-            );
-          })}
-        </Card>
-      )}
-      {recentAnswered.length > 0 && (
-        <div>
-          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, fontWeight: 500, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 10 }}>Recent Testimonies</div>
-          {recentAnswered.map(p => (
-            <Card key={p.id} style={{ borderLeft: `3px solid ${T.sage}` }}>
-              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16, fontWeight: 600, color: T.ink, marginBottom: 4 }}>{p.title}</div>
-              {p.answeredNote && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, lineHeight: 1.5 }}>{p.answeredNote}</div>}
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+
 
 function Toggle({ val, onToggle }) {
   return (
