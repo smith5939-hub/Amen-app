@@ -1,0 +1,16 @@
+{
+  "name": "LIFT - Log It For Transformation",
+  "short_name": "LIFT",
+  "description": "A quiet place to bring your prayers, hold others up, and remember how God moves.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAF8F4",
+  "theme_color": "#5C8068",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
