@@ -153,7 +153,7 @@ function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToLi
         {activePrayMode && !isAnswered ? (
           <button onClick={handleCover} style={{ width: 26, height: 26, borderRadius: "50%", border: `1.5px solid ${covered ? T.sage : T.sageLight}`, background: covered ? T.sage : "transparent", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, transition: "all 0.2s", padding: 0 }}>
             <span style={{ color: covered ? T.white : T.sageLight, fontSize: 10 }}>🙏</span>
-          </div>
+          </button>
         ) : (
           <div style={{ width: 9, height: 9, borderRadius: "50%", background: covered ? T.sageLight : accent, flexShrink: 0, marginLeft: 1 }} />
         )}
@@ -289,7 +289,7 @@ function AddPrayerModal({ onClose, onAdd, editPrayer = null, friends = [], defau
             return (
               <button key={c} onClick={() => toggleCat(c)} style={{ border: `1.5px solid ${on ? cc.text : T.parchment}`, background: on ? cc.bg : T.white, borderRadius: 20, padding: "5px 12px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", color: on ? cc.text : T.inkLight, fontWeight: on ? 500 : 400 }}>
                 {on ? "✓ " : ""}{c}
-              </div>
+              </button>
             );
           })}
           {selectedCats.filter(c => !cats.includes(c)).map(c => (
@@ -404,7 +404,7 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
       ) : (
         <button onClick={() => { setActivePrayMode(true); setStatusFilter("active"); }} style={{ width: "100%", background: T.goldLight, border: `1.5px dashed ${T.gold}`, borderRadius: 14, padding: "11px 16px", marginBottom: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.gold, fontWeight: 500 }}>
           <span style={{ fontSize: 18 }}>🙏</span> Start Praying Through My List
-        </div>
+        </button>
       )}
       <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center" }}>
         <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>{active.length} active prayer{active.length !== 1 ? "s" : ""}</div>
@@ -594,7 +594,7 @@ function TestimonyModal({ prayer, onClose }) {
   const cats = Array.isArray(prayer.categories) ? prayer.categories : [prayer.categories].filter(Boolean);
   const fmtFull = (d) => new Date(d).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box" }}>
       <div style={{ background: T.cream, borderRadius: 20, padding: "24px 20px 28px", width: "100%", maxWidth: 480, maxHeight: "calc(100vh - 80px)", overflowY: "auto", boxShadow: "0 12px 36px rgba(0,0,0,0.18)" }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 10, minWidth: 0 }}>
@@ -748,7 +748,7 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
                 }} style={{ flex: 1, border: `1.5px solid ${selected ? T.sageDark : T.parchment}`, background: selected ? T.sageLight : "transparent", borderRadius: 12, padding: "8px 4px", cursor: "pointer", textAlign: "center" }}>
                   <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: selected ? 500 : 400, color: selected ? T.sageDark : T.ink }}>{t.label}</div>
                   <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight }}>{t.sub}</div>
-                </div>);
+                </button>);
               })}
             </div>
           </div>
@@ -787,7 +787,7 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
         ))}
       </div>
 
-      <div onClick={() => setShowTestimonies(!showTestimonies)} style={{ width: "100%", background: T.answeredBg, borderRadius: 14, padding: "14px 18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+      <button onClick={() => setShowTestimonies(!showTestimonies)} style={{ width: "100%", border: "none", background: T.answeredBg, borderRadius: 14, padding: "14px 18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 20 }}>🙌</span>
           <div style={{ textAlign: "left" }}>
@@ -804,7 +804,7 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, padding: "12px 0", fontStyle: "italic", textAlign: "center" }}>No answered prayers yet — keep praying!</div>
           )}
           {testimonies.map(p => (
-            <Card key={p.id} onClick={(e) => { e.stopPropagation(); console.log("testimony clicked", p.title); setViewTestimony(p); }} style={{ borderLeft: `3px solid ${T.sage}`, marginBottom: 8, cursor: "pointer" }}>
+            <Card key={p.id} onClick={() => setViewTestimony(p)} style={{ borderLeft: `3px solid ${T.sage}`, marginBottom: 8, cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16, fontWeight: 600, color: T.ink, marginBottom: 4 }}>{p.title}</div>
@@ -981,7 +981,7 @@ function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequest
             {incomingRequests.length > 0 && <span style={{ background: T.dustyRose, color: T.white, borderRadius: 20, padding: "1px 8px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 700 }}>{incomingRequests.length} pending</span>}
           </div>
           <span style={{ color: T.inkLight, fontSize: 14 }}>{friendsOpen ? "▲" : "▾"}</span>
-        </div>
+        </button>
 
         {friendsOpen && (
           <div style={{ padding: "0 18px 18px" }}>
@@ -1710,7 +1710,7 @@ function Reflect({ prayers, user, addPrayer }) {
                 style={{ border: "none", background: "none", fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: REFLECT_COLORS.guided.border, cursor: "pointer", fontWeight: 500 }}
               >
                 {showAllJournal ? "Show less ›" : `See all ${journalEntries.length} ›`}
-              </div>
+              </button>
             )}
           </div>
           {(showAllJournal ? journalEntries : journalEntries.slice(0, 5)).map(e => (
@@ -1860,7 +1860,7 @@ function BottomNav({ active, setActive, requestCount }) {
           )}
           <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: active === t.id ? T.sageDark : T.inkLight, fontWeight: active === t.id ? 500 : 400 }}>{t.label}</span>
           {active === t.id && <div style={{ width: 4, height: 4, borderRadius: "50%", background: T.sageDark }} />}
-        </div>
+        </button>
       ))}
     </div>
   );
