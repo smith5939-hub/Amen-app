@@ -388,20 +388,28 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
   const handleRemoveFromMyList = async (prayer) => {
     if (!currentUser?.uid) return;
 
-    const { prayerId } = getOriginalPrayerInfo(prayer);
+    try {
+      const { prayerId } = getOriginalPrayerInfo(prayer);
 
-    const snap = await getDocs(query(
-      collection(db, "prayingRecords"),
-      where("prayerId", "==", prayerId),
-      where("prayingUserId", "==", currentUser.uid)
-    ));
+      // Remove the "I'm praying" record for the original prayer
+      const prayingSnap = await getDocs(query(
+        collection(db, "prayingRecords"),
+        where("prayerId", "==", prayerId),
+        where("prayingUserId", "==", currentUser.uid)
+      ));
 
-    for (const record of snap.docs) {
-      await deleteDoc(record.ref);
+      for (const record of prayingSnap.docs) {
+        await deleteDoc(record.ref);
+      }
+
+      // Remove the copied held prayer card from this user's own prayer list
+      await deleteDoc(doc(db, "prayers", prayer.id));
+
+      showToast("Removed from your list");
+    } catch (err) {
+      console.error("Remove from my list failed:", err);
+      showToast("Could not remove prayer");
     }
-
-    await deletePrayer(prayer.id);
-    showToast("Removed from your list");
   };
 
   const handlePrayForHeldPrayer = async (prayer) => {
