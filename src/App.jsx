@@ -1,8 +1,11 @@
 import { useState, useEffect, createContext, useContext } from "react";
 import { auth, db, functions } from "./firebase";
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "firebase/auth";
-import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs } from "firebase/firestore";
+import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, writeBatch } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
+import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 const callClaude = async (prompt) => {
   const proxy = httpsCallable(functions, "claudeProxy");
@@ -78,6 +81,7 @@ const maskEmail = (email) => {
 };
 
 const SORT_OPTIONS = [
+  { id: "manual", label: "Manual" },
   { id: "newest", label: "Newest" },
   { id: "oldest", label: "Oldest" },
   { id: "longest", label: "Longest waiting" },
@@ -335,6 +339,55 @@ function AnswerModal({ prayer, onClose, onConfirm }) {
   );
 }
 
+
+function SortablePrayerCard({ id, title, children }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        position: "relative",
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 20 : "auto",
+        opacity: isDragging ? 0.94 : 1,
+      }}
+    >
+      <button
+        type="button"
+        aria-label={`Drag to reorder ${title || "prayer"}`}
+        {...attributes}
+        {...listeners}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: "absolute",
+          right: 10,
+          top: 10,
+          zIndex: 5,
+          width: 34,
+          height: 34,
+          borderRadius: 12,
+          border: `1px solid ${T.parchment}`,
+          background: T.white,
+          color: T.inkLight,
+          cursor: isDragging ? "grabbing" : "grab",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+          touchAction: "none",
+          fontSize: 16,
+          lineHeight: 1,
+        }}
+      >
+        ⋮⋮
+      </button>
+      {children}
+    </div>
+  );
+}
+
 function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, firstName, defaultPublic, currentUser }) {
   const showToast = useToast();
   const [showAdd, setShowAdd] = useState(false);
@@ -342,30 +395,71 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
   const [editTarget, setEditTarget] = useState(null);
   const [statusFilter, setStatusFilter] = useState("active");
   const [catFilter, setCatFilter] = useState("All");
-  const [sort, setSort] = useState("newest");
+  const [sort, setSort] = useState("manual");
   const [showFilters, setShowFilters] = useState(false);
   const [activePrayMode, setActivePrayMode] = useState(false);
   const [coveredIds, setCoveredIds] = useState([]);
   const [celebrationPrayer, setCelebrationPrayer] = useState(null);
   const [prayingIds, setPrayingIds] = useState([]);
+  const [reorderMode, setReorderMode] = useState(false);
+  const [localPrayerOrder, setLocalPrayerOrder] = useState([]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } })
+  );
   const catsOf = (p) => Array.isArray(p.categories) ? p.categories : [p.categories].filter(Boolean);
   const active = prayers.filter(p => p.status === "active");
   const answered = prayers.filter(p => p.status === "answered");
   const allCats = ["All", ...Array.from(new Set(prayers.flatMap(catsOf).concat(Object.keys(CAT_COLORS))))];
   let shown = statusFilter === "active" ? active : answered;
   if (catFilter !== "All") shown = shown.filter(p => catsOf(p).includes(catFilter));
+  const prayerTime = (p) => {
+    const raw = p.createdAt || p.date;
+    const t = raw ? new Date(raw).getTime() : 0;
+    return Number.isFinite(t) ? t : 0;
+  };
+
   shown = [...shown].sort((a, b) => {
+    if (sort === "manual") {
+      const aOrder = a.sortOrder !== undefined && a.sortOrder !== null && Number.isFinite(Number(a.sortOrder)) ? Number(a.sortOrder) : null;
+      const bOrder = b.sortOrder !== undefined && b.sortOrder !== null && Number.isFinite(Number(b.sortOrder)) ? Number(b.sortOrder) : null;
+
+      if (aOrder !== null || bOrder !== null) {
+        if (aOrder === null) return 1;
+        if (bOrder === null) return -1;
+        if (aOrder !== bOrder) return aOrder - bOrder;
+      }
+
+      return prayerTime(b) - prayerTime(a);
+    }
+
     if (sort === "newest") return new Date(b.date) - new Date(a.date);
     if (sort === "oldest" || sort === "longest") return new Date(a.date) - new Date(b.date);
     if (sort === "az") return a.title.localeCompare(b.title);
     return 0;
   });
-  const mineOwn = shown.filter(p => !p.fromFriend);
+
+  let mineOwn = shown.filter(p => !p.fromFriend);
+
+  if (localPrayerOrder.length > 0) {
+    const orderMap = new Map(localPrayerOrder.map((id, index) => [id, index]));
+    mineOwn = [...mineOwn].sort((a, b) => {
+      const aIndex = orderMap.has(a.id) ? orderMap.get(a.id) : Number.MAX_SAFE_INTEGER;
+      const bIndex = orderMap.has(b.id) ? orderMap.get(b.id) : Number.MAX_SAFE_INTEGER;
+      if (aIndex !== bIndex) return aIndex - bIndex;
+      return 0;
+    });
+  }
+
   const heldForOthers = shown.filter(p => p.fromFriend);
   const coveredCount = coveredIds.filter(id => shown.find(p => p.id === id)).length;
 
   const handleAdd = async ({ title, note, categories, isPublic, prayerDate }) => {
-    await addPrayer({ title, note, categories, isPublic, prayerDate });
+    const myActivePrayers = prayers.filter(p => !p.fromFriend && p.status === "active");
+    const maxSortOrder = Math.max(0, ...myActivePrayers.map(p => Number(p.sortOrder) || 0));
+
+    await addPrayer({ title, note, categories, isPublic, prayerDate, sortOrder: maxSortOrder + 1000 });
     setShowAdd(false);
     showToast("Prayer added");
   };
@@ -442,6 +536,48 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
 
     showToast("They'll know you're praying");
   };
+  const handleToggleReorder = () => {
+    if (reorderMode) {
+      setReorderMode(false);
+      return;
+    }
+
+    setStatusFilter("active");
+    setSort("manual");
+    setShowFilters(false);
+    setActivePrayMode(false);
+    setReorderMode(true);
+  };
+
+  const handleDragEnd = async (event) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = mineOwn.findIndex(p => p.id === active.id);
+    const newIndex = mineOwn.findIndex(p => p.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+
+    const reordered = arrayMove(mineOwn, oldIndex, newIndex);
+    setLocalPrayerOrder(reordered.map(p => p.id));
+
+    try {
+      const batch = writeBatch(db);
+
+      reordered.forEach((prayer, index) => {
+        batch.update(doc(db, "prayers", prayer.id), {
+          sortOrder: (index + 1) * 1000,
+        });
+      });
+
+      await batch.commit();
+      showToast("Prayer order saved");
+    } catch (err) {
+      console.error("Prayer reorder failed:", err);
+      setLocalPrayerOrder([]);
+      showToast("Could not save order");
+    }
+  };
+
   const handleAnswer = async (note) => {
     const prayer = answerTarget;
     await updatePrayer(prayer.id, { status: "answered", answeredNote: note });
@@ -491,6 +627,9 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
       <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center" }}>
         <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>{active.length} active prayer{active.length !== 1 ? "s" : ""}</div>
         <button onClick={() => setShowFilters(!showFilters)} style={{ marginLeft: "auto", border: `1px solid ${showFilters ? T.sageDark : T.parchment}`, borderRadius: 20, padding: "6px 12px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", background: showFilters ? T.sageLight : "transparent", color: showFilters ? T.sageDark : T.inkLight }}>⊞ Filter</button>
+        {statusFilter === "active" && mineOwn.length > 1 && !activePrayMode && (
+          <button onClick={handleToggleReorder} style={{ border: `1px solid ${reorderMode ? T.sageDark : T.parchment}`, borderRadius: 20, padding: "6px 12px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", background: reorderMode ? T.sageLight : "transparent", color: reorderMode ? T.sageDark : T.inkLight }}>{reorderMode ? "Done" : "↕ Reorder"}</button>
+        )}
       </div>
       {showFilters && (
         <div style={{ background: T.white, borderRadius: 14, padding: "14px 16px", marginBottom: 12, boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
@@ -521,7 +660,19 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, lineHeight: 1.6 }}>{statusFilter === "active" ? "Tap + Add to bring your first prayer before God." : "Keep praying — answered prayers will appear here."}</div>
         </div>
       )}
-      {mineOwn.map(p => renderCard(p, true))}
+      {reorderMode && statusFilter === "active" && mineOwn.length > 0 ? (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={mineOwn.map(p => p.id)} strategy={verticalListSortingStrategy}>
+            {mineOwn.map(p => (
+              <SortablePrayerCard key={p.id} id={p.id} title={p.title}>
+                {renderCard(p, true)}
+              </SortablePrayerCard>
+            ))}
+          </SortableContext>
+        </DndContext>
+      ) : (
+        mineOwn.map(p => renderCard(p, true))
+      )}
       {heldForOthers.length > 0 && (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "20px 4px 14px" }}>
