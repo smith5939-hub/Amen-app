@@ -376,6 +376,10 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
   };
   const handleDelete = async (id) => { await deletePrayer(id); showToast("Prayer removed"); };
   const getOriginalPrayerInfo = (prayer) => {
+    if (prayer.originalOwnerId && prayer.originalPrayerId) {
+      return { ownerId: prayer.originalOwnerId, prayerId: prayer.originalPrayerId };
+    }
+
     if (!prayer.sourceKey) return { ownerId: prayer.userId, prayerId: prayer.id };
 
     const parts = prayer.sourceKey.split("-");
@@ -391,19 +395,24 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
     try {
       const { prayerId } = getOriginalPrayerInfo(prayer);
 
-      // Remove the "I'm praying" record for the original prayer
-      const prayingSnap = await getDocs(query(
-        collection(db, "prayingRecords"),
-        where("prayerId", "==", prayerId),
-        where("prayingUserId", "==", currentUser.uid)
-      ));
-
-      for (const record of prayingSnap.docs) {
-        await deleteDoc(record.ref);
-      }
-
-      // Remove the copied held prayer card from this user's own prayer list
+      // First remove the copied held prayer card from this user's own prayer list
       await deleteDoc(doc(db, "prayers", prayer.id));
+
+      // Then best-effort remove the praying record.
+      // If Firestore rules block this, the card is still removed from this user's list.
+      try {
+        const prayingSnap = await getDocs(query(
+          collection(db, "prayingRecords"),
+          where("prayerId", "==", prayerId),
+          where("prayingUserId", "==", currentUser.uid)
+        ));
+
+        for (const record of prayingSnap.docs) {
+          await deleteDoc(record.ref);
+        }
+      } catch (recordErr) {
+        console.warn("Copied prayer removed, but prayingRecords cleanup failed:", recordErr);
+      }
 
       showToast("Removed from your list");
     } catch (err) {
@@ -1023,6 +1032,8 @@ function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequest
       await addPrayer({
         ...prayer,
         sourceKey: key,
+        originalOwnerId: prayer.userId,
+        originalPrayerId: prayer.id,
         isPublic: false,
         status: "active",
         date: today(),
@@ -2100,6 +2111,8 @@ export default function App() {
       fromFriend: fields.fromFriend || false,
       ownerName: fields.ownerName || null,
       sourceKey: fields.sourceKey || null,
+      originalOwnerId: fields.originalOwnerId || null,
+      originalPrayerId: fields.originalPrayerId || null,
       prayerDate: fields.prayerDate || null,
       createdAt: new Date().toISOString(),
     });
