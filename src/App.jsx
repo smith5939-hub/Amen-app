@@ -1832,12 +1832,10 @@ function NavIcon({ type, active }) {
   if (type === "prayers") {
     return (
       <svg {...common}>
-        <path d="M8 6h13" />
-        <path d="M8 12h13" />
-        <path d="M8 18h13" />
-        <path d="M3 6h.01" />
-        <path d="M3 12h.01" />
-        <path d="M3 18h.01" />
+        <path d="M9 11V7a3 3 0 0 1 6 0v4" />
+        <path d="M9 11a3 3 0 0 0-3 3v1l1 6h8l1-6v-1a3 3 0 0 0-3-3H9z" />
+        <path d="M6 14H5a2 2 0 0 0-2 2v1l1 4h2" />
+        <path d="M18 14h1a2 2 0 0 1 2 2v1l-1 4h-2" />
       </svg>
     );
   }
