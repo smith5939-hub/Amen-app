@@ -1831,15 +1831,14 @@ function NavIcon({ type, active }) {
 
   if (type === "prayers") {
     return (
-      <PiHandsPrayingBold
-        aria-hidden="true"
-        style={{
-          width: 24,
-          height: 24,
-          color: active ? T.sageDark : T.inkLight,
-          display: "block"
-        }}
-      />
+      <svg {...common}>
+        <path d="M8 6h13" />
+        <path d="M8 12h13" />
+        <path d="M8 18h13" />
+        <path d="M3 6h.01" />
+        <path d="M3 12h.01" />
+        <path d="M3 18h.01" />
+      </svg>
     );
   }
 
