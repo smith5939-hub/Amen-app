@@ -335,7 +335,7 @@ function AnswerModal({ prayer, onClose, onConfirm }) {
   );
 }
 
-function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, firstName, defaultPublic }) {
+function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, firstName, defaultPublic, currentUser }) {
   const showToast = useToast();
   const [showAdd, setShowAdd] = useState(false);
   const [answerTarget, setAnswerTarget] = useState(null);
@@ -347,6 +347,7 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
   const [activePrayMode, setActivePrayMode] = useState(false);
   const [coveredIds, setCoveredIds] = useState([]);
   const [celebrationPrayer, setCelebrationPrayer] = useState(null);
+  const [prayingIds, setPrayingIds] = useState([]);
   const catsOf = (p) => Array.isArray(p.categories) ? p.categories : [p.categories].filter(Boolean);
   const active = prayers.filter(p => p.status === "active");
   const answered = prayers.filter(p => p.status === "answered");
@@ -374,11 +375,55 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
     showToast("Changes saved");
   };
   const handleDelete = async (id) => { await deletePrayer(id); showToast("Prayer removed"); };
+  const getOriginalPrayerInfo = (prayer) => {
+    if (!prayer.sourceKey) return { ownerId: prayer.userId, prayerId: prayer.id };
+
+    const parts = prayer.sourceKey.split("-");
+    const ownerId = parts.shift();
+    const prayerId = parts.join("-");
+
+    return { ownerId, prayerId };
+  };
+
   const handleRemoveFromMyList = async (prayer) => {
-    const { getDocs, query, collection, where, deleteDoc } = await import("firebase/firestore");
-    const snap = await getDocs(query(collection(db, "prayingRecords"), where("prayerId", "==", prayer.id), where("prayingUserId", "==", currentUser.uid)));
-    for (const doc of snap.docs) { await deleteDoc(doc.ref); }
+    if (!currentUser?.uid) return;
+
+    const { prayerId } = getOriginalPrayerInfo(prayer);
+
+    const snap = await getDocs(query(
+      collection(db, "prayingRecords"),
+      where("prayerId", "==", prayerId),
+      where("prayingUserId", "==", currentUser.uid)
+    ));
+
+    for (const record of snap.docs) {
+      await deleteDoc(record.ref);
+    }
+
+    await deletePrayer(prayer.id);
     showToast("Removed from your list");
+  };
+
+  const handlePrayForHeldPrayer = async (prayer) => {
+    if (!currentUser?.uid) return;
+    if (prayingIds.includes(prayer.id)) return;
+
+    const { ownerId, prayerId } = getOriginalPrayerInfo(prayer);
+    if (!ownerId || !prayerId || ownerId === currentUser.uid) return;
+
+    setPrayingIds(prev => [...prev, prayer.id]);
+
+    await addDoc(collection(db, "prayingRecords"), {
+      prayerOwnerId: ownerId,
+      prayerTitle: prayer.title,
+      prayingUserId: currentUser.uid,
+      prayerName: currentUser.displayName || "A friend",
+      prayerId,
+      note: null,
+      createdAt: new Date().toISOString(),
+    });
+
+    showToast("They'll know you're praying");
   };
   const handleAnswer = async (note) => {
     const prayer = answerTarget;
@@ -389,7 +434,20 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
   const toggleCovered = (id) => setCoveredIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const endSession = () => { setActivePrayMode(false); setCoveredIds([]); };
   const renderCard = (p, isMine = true) => (
-    <PrayerCard key={p.id} prayer={p} mine={isMine} onAnswer={isMine ? setAnswerTarget : undefined} onDelete={isMine ? handleDelete : (p) => handleRemoveFromMyList(p)} onEdit={isMine ? setEditTarget : undefined} activePrayMode={activePrayMode} covered={coveredIds.includes(p.id)} onToggleCovered={toggleCovered} friends={friends} />
+    <PrayerCard
+      key={p.id}
+      prayer={p}
+      mine={isMine}
+      onAnswer={isMine ? setAnswerTarget : undefined}
+      onDelete={isMine ? handleDelete : handleRemoveFromMyList}
+      onEdit={isMine ? setEditTarget : undefined}
+      myPrayingIds={isMine ? undefined : prayingIds}
+      onTogglePraying={isMine ? undefined : handlePrayForHeldPrayer}
+      activePrayMode={activePrayMode}
+      covered={coveredIds.includes(p.id)}
+      onToggleCovered={toggleCovered}
+      friends={friends}
+    />
   );
   return (
     <div style={tabContent}>
@@ -2107,7 +2165,7 @@ export default function App() {
             <div style={{ textAlign: "center", padding: "60px 20px", fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight }}>Loading your prayers...</div>
           ) : (
             <>
-              {tab === "prayers" && <MyPrayers prayers={prayers} addPrayer={addPrayer} updatePrayer={updatePrayer} deletePrayer={deletePrayer} friends={friends} firstName={firstName} defaultPublic={defaultPublic} />}
+              {tab === "prayers" && <MyPrayers prayers={prayers} addPrayer={addPrayer} updatePrayer={updatePrayer} deletePrayer={deletePrayer} friends={friends} firstName={firstName} defaultPublic={defaultPublic} currentUser={user} />}
               {tab === "community" && <Community currentUser={user} friends={friends} myPrayers={prayers} addPrayer={addPrayer} incomingRequests={incomingRequests} onAccept={acceptRequest} onDecline={declineRequest} onSendRequest={sendFriendRequest} />}
               {tab === "notifications" && <Notifications currentUser={user} />}
               {tab === "reflect" && <Reflect prayers={prayers} user={user} addPrayer={addPrayer} />}
