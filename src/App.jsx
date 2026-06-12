@@ -204,6 +204,7 @@ function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToLi
           {!mine && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <Btn small variant={isPraying ? "secondary" : "ghost"} onClick={() => onTogglePraying(prayer)}>🙏 {isPraying ? "Praying for this" : "I'm Praying"}</Btn>
+              {onDelete && <Btn small variant="ghost" onClick={() => onDelete(prayer)}>Remove from my list</Btn>}
             </div>
           )}
           {mine && prayer.status === "active" && (
@@ -373,6 +374,12 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
     showToast("Changes saved");
   };
   const handleDelete = async (id) => { await deletePrayer(id); showToast("Prayer removed"); };
+  const handleRemoveFromMyList = async (prayer) => {
+    const { getDocs, query, collection, where, deleteDoc } = await import("firebase/firestore");
+    const snap = await getDocs(query(collection(db, "prayingRecords"), where("prayerId", "==", prayer.id), where("prayingUserId", "==", currentUser.uid)));
+    for (const doc of snap.docs) { await deleteDoc(doc.ref); }
+    showToast("Removed from your list");
+  };
   const handleAnswer = async (note) => {
     const prayer = answerTarget;
     await updatePrayer(prayer.id, { status: "answered", answeredNote: note });
@@ -382,7 +389,7 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
   const toggleCovered = (id) => setCoveredIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const endSession = () => { setActivePrayMode(false); setCoveredIds([]); };
   const renderCard = (p, isMine = true) => (
-    <PrayerCard key={p.id} prayer={p} mine={isMine} onAnswer={isMine ? setAnswerTarget : undefined} onDelete={isMine ? handleDelete : undefined} onEdit={isMine ? setEditTarget : undefined} activePrayMode={activePrayMode} covered={coveredIds.includes(p.id)} onToggleCovered={toggleCovered} friends={friends} />
+    <PrayerCard key={p.id} prayer={p} mine={isMine} onAnswer={isMine ? setAnswerTarget : undefined} onDelete={isMine ? handleDelete : (p) => handleRemoveFromMyList(p)} onEdit={isMine ? setEditTarget : undefined} activePrayMode={activePrayMode} covered={coveredIds.includes(p.id)} onToggleCovered={toggleCovered} friends={friends} />
   );
   return (
     <div style={tabContent}>
