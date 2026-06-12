@@ -1831,7 +1831,7 @@ function NavIcon({ type, active }) {
 
   if (type === "prayers") {
     return (
-      <img src="/praying-hands.png" alt="Prayers" style={{ width: 24, height: 24, objectFit: "contain" }} />
+      <img src="/praying-hands.png" alt="Prayers" style={{ width: 24, height: 24, objectFit: "contain", mixBlendMode: "multiply" }} />
     );
   }
 
