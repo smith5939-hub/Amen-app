@@ -863,6 +863,7 @@ function SignIn() {
     setError(null);
     try {
       const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
       await signInWithPopup(auth, provider);
     } catch (e) {
       setError("Sign in failed. Please try again.");
