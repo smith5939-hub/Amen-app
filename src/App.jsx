@@ -1831,12 +1831,7 @@ function NavIcon({ type, active }) {
 
   if (type === "prayers") {
     return (
-      <svg {...common}>
-        <path d="M12 2 C12 2 8 6 8 10 L8 14 L12 17 L16 14 L16 10 C16 6 12 2 12 2 Z" />
-        <path d="M8 10 C6 9 4 10 3 12 L3 17 L8 17" />
-        <path d="M16 10 C18 9 20 10 21 12 L21 17 L16 17" />
-        <path d="M8 14 L8 20 Q12 22 16 20 L16 14" />
-      </svg>
+      <span style={{ fontSize: 22, lineHeight: 1 }}>🙏</span>
     );
   }
 
