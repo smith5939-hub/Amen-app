@@ -1560,27 +1560,32 @@ function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequest
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
             <Avatar initials={(friend.displayName || "?").split(" ").map(n => n[0]).join("").slice(0, 2)} photoURL={friend.photoURL} />
             <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: T.ink }}>{friend.displayName || "Friend"}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: T.ink }}>{friend.displayName || "Friend"}</div>
+                {(friend.prayers?.length || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => addAllFriendPrayersFromCommunity(friend)}
+                    style={{
+                      border: `1px solid ${T.sageDark}`,
+                      background: "transparent",
+                      color: T.sageDark,
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      padding: "2px 8px",
+                      borderRadius: 20,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 3,
+                    }}
+                  >
+                    + Add All
+                  </button>
+                )}
+              </div>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{friend.prayers?.length || 0} shared prayer{(friend.prayers?.length || 0) !== 1 ? "s" : ""}</div>
-              {(friend.prayers?.length || 0) > 0 && (
-                <button
-                  type="button"
-                  onClick={() => addAllFriendPrayersFromCommunity(friend)}
-                  style={{
-                    marginTop: 4,
-                    border: "none",
-                    background: "transparent",
-                    color: T.sageDark,
-                    fontFamily: "'DM Sans', sans-serif",
-                    fontSize: 12,
-                    fontWeight: 700,
-                    padding: 0,
-                    cursor: "pointer",
-                  }}
-                >
-                  Add All
-                </button>
-              )}
             </div>
           </div>
           {(friend.prayers || []).map(p => (
@@ -2380,13 +2385,7 @@ export default function App() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        await setDoc(doc(db, "users", firebaseUser.uid), {
-          uid: firebaseUser.uid,
-          displayName: firebaseUser.displayName || "",
-          email: firebaseUser.email || "",
-          photoURL: firebaseUser.photoURL || "",
-          updatedAt: new Date().toISOString(),
-        }, { merge: true });
+        await syncLatestGoogleProfileToFirestore(firebaseUser);
       }
       setUser(firebaseUser || null);
       if (firebaseUser) {
