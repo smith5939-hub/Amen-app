@@ -22,6 +22,40 @@ import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } 
 import { CSS } from "@dnd-kit/utilities";
 
 
+async function syncLatestGoogleProfileToFirestore(firebaseUser) {
+  if (!firebaseUser) return;
+
+  const googleProfile = firebaseUser.providerData?.find(
+    (profile) => profile.providerId === "google.com"
+  );
+
+  const fallbackName = firebaseUser.email?.split("@")[0] || "Friend";
+
+  try {
+    await setDoc(
+      doc(db, "users", firebaseUser.uid),
+      {
+        uid: firebaseUser.uid,
+        displayName:
+          googleProfile?.displayName ||
+          firebaseUser.displayName ||
+          fallbackName,
+        email: firebaseUser.email || "",
+        photoURL:
+          googleProfile?.photoURL ||
+          firebaseUser.photoURL ||
+          "",
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  } catch (error) {
+    console.warn("Unable to sync latest Google profile to Firestore", error);
+  }
+}
+
+
+
 async function syncGoogleProfileToFirestore(firebaseUser) {
   if (!firebaseUser) return;
 
@@ -1254,6 +1288,82 @@ function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequest
   const showToast = useToast();
   const [prayingIds, setPrayingIds] = useState([]);
   const [friendsOpen, setFriendsOpen] = useState(false);
+
+
+  const addAllFriendPrayersFromCommunity = async (friend) => {
+    const friendPrayers = (friend?.prayers || []).filter(
+      (prayer) =>
+        !prayer.answered &&
+        !prayer.isAnswered &&
+        prayer.status !== "answered"
+    );
+
+    if (!friendPrayers.length) {
+      alert("No active prayers to add.");
+      return;
+    }
+
+    const heldSourceIds = new Set(
+      (myPrayers || [])
+        .map(
+          (prayer) =>
+            prayer.sourcePrayerId ||
+            prayer.originalPrayerId ||
+            prayer.friendPrayerId ||
+            prayer.sourceId
+        )
+        .filter(Boolean)
+    );
+
+    let added = 0;
+    let skipped = 0;
+
+    for (const prayer of friendPrayers) {
+      const sourceId =
+        prayer.sourcePrayerId ||
+        prayer.originalPrayerId ||
+        prayer.friendPrayerId ||
+        prayer.sourceId ||
+        prayer.id;
+
+      if (!sourceId || heldSourceIds.has(sourceId)) {
+        skipped += 1;
+        continue;
+      }
+
+      await addPrayer({
+        title: prayer.title || "",
+        note: prayer.note || "",
+        category: prayer.category || "General",
+        categories: prayer.categories || (prayer.category ? [prayer.category] : []),
+        date: prayer.date || "",
+        dateTag: prayer.dateTag || "",
+        shared: false,
+        isPrivate: true,
+        held: true,
+        isHeldPrayer: true,
+        readOnly: true,
+        ownerId: friend.uid || prayer.userId || null,
+        heldForUserId: friend.uid || prayer.userId || null,
+        ownerName: friend.displayName || prayer.ownerName || "Friend",
+        sourcePrayerId: sourceId,
+        originalPrayerId: sourceId,
+        friendPrayerId: sourceId,
+      });
+
+      heldSourceIds.add(sourceId);
+      added += 1;
+    }
+
+    if (added > 0 && skipped > 0) {
+      alert(`Added ${added} new prayer${added === 1 ? "" : "s"}. ${skipped} already in your list.`);
+    } else if (added > 0) {
+      alert(`Added ${added} prayer${added === 1 ? "" : "s"} to Holding for Others.`);
+    } else {
+      alert("You're already holding all of these prayers.");
+    }
+  };
+
   const [encourageTarget, setEncourageTarget] = useState(null);
   const [search, setSearch] = useState("");
   const [searchResult, setSearchResult] = useState(null);
@@ -1452,6 +1562,25 @@ function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequest
             <div style={{ flex: 1 }}>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: T.ink }}>{friend.displayName || "Friend"}</div>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{friend.prayers?.length || 0} shared prayer{(friend.prayers?.length || 0) !== 1 ? "s" : ""}</div>
+              {(friend.prayers?.length || 0) > 0 && (
+                <button
+                  type="button"
+                  onClick={() => addAllFriendPrayersFromCommunity(friend)}
+                  style={{
+                    marginTop: 4,
+                    border: "none",
+                    background: "transparent",
+                    color: T.sageDark,
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: 0,
+                    cursor: "pointer",
+                  }}
+                >
+                  Add All
+                </button>
+              )}
             </div>
           </div>
           {(friend.prayers || []).map(p => (
