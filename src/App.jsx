@@ -1251,7 +1251,7 @@ function SignIn() {
   };
   return (
     <div style={{ minHeight: "100vh", background: T.cream, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32 }}>
-      <img src="/lift-logo.png" alt="LIFT" style={{ width: 160, height: 160, marginBottom: 8, objectFit: "contain" }} />
+      <img src="/LIFT Logo.png" alt="LIFT" style={{ width: 160, height: 160, marginBottom: 8, objectFit: "contain" }} />
       <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.sageDark, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 500, marginBottom: 24 }}>Log it for Transformation</div>
       <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: T.inkLight, textAlign: "center", maxWidth: 270, lineHeight: 1.6, marginBottom: 32 }}>A quiet place to bring your prayers, hold others up, and remember how God moves.</div>
       {error && <div style={{ color: T.dustyRose, fontFamily: "'DM Sans', sans-serif", fontSize: 13, marginBottom: 16 }}>{error}</div>}
