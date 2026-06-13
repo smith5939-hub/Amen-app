@@ -1,11 +1,49 @@
 import { useState, useEffect, createContext, useContext } from "react";
 import { auth, db, functions } from "./firebase";
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "firebase/auth";
-import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, writeBatch } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  where,
+  writeBatch
+} from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+
+
+async function syncGoogleProfileToFirestore(firebaseUser) {
+  if (!firebaseUser) return;
+
+  const fallbackName = firebaseUser.email?.split("@")[0] || "Friend";
+
+  try {
+    await setDoc(
+      doc(db, "users", firebaseUser.uid),
+      {
+        uid: firebaseUser.uid,
+        displayName: firebaseUser.displayName || fallbackName,
+        email: firebaseUser.email || "",
+        photoURL: firebaseUser.photoURL || "",
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  } catch (error) {
+    console.warn("Unable to sync Google profile to Firestore", error);
+  }
+}
+
 
 const callClaude = async (prompt) => {
   const proxy = httpsCallable(functions, "claudeProxy");
@@ -588,6 +626,53 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
   };
   const toggleCovered = (id) => setCoveredIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const endSession = () => { setActivePrayMode(false); setCoveredIds([]); };
+
+  const handleAddAllFriendPrayers = async (friendPrayers = []) => {
+    const activePrayers = (friendPrayers || []).filter(
+      (prayer) => !prayer.answered && !prayer.isAnswered && prayer.status !== "answered"
+    );
+
+    let added = 0;
+    let skipped = 0;
+
+    for (const prayer of activePrayers) {
+      const sourceId =
+        prayer.originalPrayerId ||
+        prayer.sourcePrayerId ||
+        prayer.friendPrayerId ||
+        prayer.sourceId ||
+        prayer.id;
+
+      const alreadyHeld = (prayers || []).some((heldPrayer) => {
+        const heldSourceId =
+          heldPrayer.originalPrayerId ||
+          heldPrayer.sourcePrayerId ||
+          heldPrayer.friendPrayerId ||
+          heldPrayer.sourceId ||
+          heldPrayer.id;
+
+        return heldSourceId === sourceId;
+      });
+
+      if (alreadyHeld) {
+        skipped += 1;
+        continue;
+      }
+
+      await onTogglePraying(prayer);
+      added += 1;
+    }
+
+    if (added > 0 && skipped > 0) {
+      alert(`Added ${added} new prayer${added === 1 ? "" : "s"}. ${skipped} already in your list.`);
+    } else if (added > 0) {
+      alert(`Added ${added} prayer${added === 1 ? "" : "s"} to Holding for Others.`);
+    } else {
+      alert("You're already holding all of these prayers.");
+    }
+  };
+
+
   const renderCard = (p, isMine = true) => (
     <PrayerCard
       key={p.id}
