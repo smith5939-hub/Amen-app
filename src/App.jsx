@@ -347,11 +347,14 @@ function SortablePrayerCard({ id, title, children }) {
     <div
       ref={setNodeRef}
       style={{
-        position: "relative",
+        display: "flex",
+        alignItems: "stretch",
+        gap: 8,
         transform: CSS.Transform.toString(transform),
         transition,
         zIndex: isDragging ? 20 : "auto",
-        opacity: isDragging ? 0.94 : 1,
+        opacity: isDragging ? 0.96 : 1,
+        position: "relative",
       }}
     >
       <button
@@ -361,29 +364,28 @@ function SortablePrayerCard({ id, title, children }) {
         {...listeners}
         onClick={(e) => e.stopPropagation()}
         style={{
-          position: "absolute",
-          right: 10,
-          top: 10,
-          zIndex: 5,
           width: 34,
-          height: 34,
-          borderRadius: 12,
+          minWidth: 34,
+          marginBottom: 9,
+          borderRadius: 14,
           border: `1px solid ${T.parchment}`,
-          background: T.white,
-          color: T.inkLight,
+          background: isDragging ? T.sageLight : T.white,
+          color: isDragging ? T.sageDark : T.inkLight,
           cursor: isDragging ? "grabbing" : "grab",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+          boxShadow: isDragging ? "0 6px 18px rgba(0,0,0,0.12)" : "0 2px 8px rgba(0,0,0,0.04)",
           touchAction: "none",
-          fontSize: 16,
+          fontSize: 18,
           lineHeight: 1,
         }}
       >
-        ⋮⋮
+        ☰
       </button>
-      {children}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -626,11 +628,36 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
       )}
       <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center" }}>
         <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>{active.length} active prayer{active.length !== 1 ? "s" : ""}</div>
-        <button onClick={() => setShowFilters(!showFilters)} style={{ marginLeft: "auto", border: `1px solid ${showFilters ? T.sageDark : T.parchment}`, borderRadius: 20, padding: "6px 12px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", background: showFilters ? T.sageLight : "transparent", color: showFilters ? T.sageDark : T.inkLight }}>⊞ Filter</button>
+        {!reorderMode && (
+          <button onClick={() => setShowFilters(!showFilters)} style={{ marginLeft: "auto", border: `1px solid ${showFilters ? T.sageDark : T.parchment}`, borderRadius: 20, padding: "6px 12px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", background: showFilters ? T.sageLight : "transparent", color: showFilters ? T.sageDark : T.inkLight }}>⊞ Filter</button>
+        )}
         {statusFilter === "active" && mineOwn.length > 1 && !activePrayMode && (
-          <button onClick={handleToggleReorder} style={{ border: `1px solid ${reorderMode ? T.sageDark : T.parchment}`, borderRadius: 20, padding: "6px 12px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", background: reorderMode ? T.sageLight : "transparent", color: reorderMode ? T.sageDark : T.inkLight }}>{reorderMode ? "Done" : "↕ Reorder"}</button>
+          <button
+            onClick={handleToggleReorder}
+            style={{
+              marginLeft: reorderMode ? "auto" : 0,
+              border: `1px solid ${reorderMode ? T.sageDark : T.parchment}`,
+              borderRadius: 20,
+              padding: reorderMode ? "7px 14px" : "6px 12px",
+              fontSize: 12,
+              cursor: "pointer",
+              fontFamily: "'DM Sans', sans-serif",
+              fontWeight: reorderMode ? 500 : 400,
+              background: reorderMode ? T.sageDark : "transparent",
+              color: reorderMode ? T.white : T.inkLight,
+              boxShadow: reorderMode ? "0 4px 12px rgba(92,128,104,0.18)" : "none",
+            }}
+          >
+            {reorderMode ? "Save Order" : "Edit Order"}
+          </button>
         )}
       </div>
+      {reorderMode && (
+        <div style={{ background: T.sageLight, border: `1px solid ${T.sage}`, borderRadius: 14, padding: "10px 14px", marginBottom: 12, fontFamily: "'DM Sans', sans-serif", color: T.sageDark }}>
+          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>Arrange your prayer rhythm</div>
+          <div style={{ fontSize: 12, opacity: 0.85 }}>Drag the handle beside each prayer into the order you want to pray through them.</div>
+        </div>
+      )}
       {showFilters && (
         <div style={{ background: T.white, borderRadius: 14, padding: "14px 16px", marginBottom: 12, boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, fontWeight: 500, letterSpacing: 0.7, textTransform: "uppercase", marginBottom: 8 }}>Category</div>
