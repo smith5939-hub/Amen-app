@@ -280,6 +280,8 @@ function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToLi
           {!mine && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <Btn small variant={isPraying ? "secondary" : "ghost"} onClick={() => onTogglePraying(prayer)}>🙏 {isPraying ? "Praying for this" : "I'm Praying"}</Btn>
+              {onAddToList && !alreadyAdded && <Btn small variant="ghost" onClick={() => onAddToList(prayer)}>+ Add to my list</Btn>}
+              {onAddToList && alreadyAdded && <Btn small variant="ghost" disabled>✓ Added</Btn>}
               {onDelete && <Btn small variant="ghost" onClick={() => onDelete(prayer)}>Remove from my list</Btn>}
             </div>
           )}
@@ -526,7 +528,7 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
     });
   }
 
-  const heldForOthers = shown.filter(p => p.fromFriend);
+  const heldForOthers = shown.filter(p => p.fromFriend && p.status !== "answered" && p.status !== "removed");
   const coveredCount = coveredIds.filter(id => shown.find(p => p.id === id)).length;
 
   const handleAdd = async ({ title, note, categories, isPublic, prayerDate }) => {
@@ -563,8 +565,8 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
     try {
       const { prayerId } = getOriginalPrayerInfo(prayer);
 
-      // First remove the copied held prayer card from this user's own prayer list
-      await deleteDoc(doc(db, "prayers", prayer.id));
+      // First mark the copied held prayer card as removed (not deleted, so it can be re-added later)
+      await updateDoc(doc(db, "prayers", prayer.id), { status: "removed" });
 
       // Then best-effort remove the praying record.
       // If Firestore rules block this, the card is still removed from this user's list.
@@ -1251,7 +1253,7 @@ function SignIn() {
   };
   return (
     <div style={{ minHeight: "100vh", background: T.cream, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32 }}>
-      <img src="/LIFT-Logo.png" alt="LIFT" style={{ width: 160, height: 160, marginBottom: 8, objectFit: "contain" }} />
+      <img src="/lift-logo.png" alt="LIFT" style={{ width: 160, height: 160, marginBottom: 8, objectFit: "contain" }} />
       <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.sageDark, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 500, marginBottom: 24 }}>Log it for Transformation</div>
       <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: T.inkLight, textAlign: "center", maxWidth: 270, lineHeight: 1.6, marginBottom: 32 }}>A quiet place to bring your prayers, hold others up, and remember how God moves.</div>
       {error && <div style={{ color: T.dustyRose, fontFamily: "'DM Sans', sans-serif", fontSize: 13, marginBottom: 16 }}>{error}</div>}
@@ -1304,6 +1306,7 @@ function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequest
 
     const heldSourceIds = new Set(
       (myPrayers || [])
+        .filter(prayer => prayer.status === "active")
         .map(
           (prayer) =>
             prayer.sourcePrayerId ||
@@ -1330,25 +1333,36 @@ function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequest
         continue;
       }
 
-      await addPrayer({
-        title: prayer.title || "",
-        note: prayer.note || "",
-        category: prayer.category || "General",
-        categories: prayer.categories || (prayer.category ? [prayer.category] : []),
-        date: prayer.date || "",
-        dateTag: prayer.dateTag || "",
-        shared: false,
-        isPrivate: true,
-        held: true,
-        isHeldPrayer: true,
-        readOnly: true,
-        ownerId: friend.uid || prayer.userId || null,
-        heldForUserId: friend.uid || prayer.userId || null,
-        ownerName: friend.displayName || prayer.ownerName || "Friend",
-        sourcePrayerId: sourceId,
-        originalPrayerId: sourceId,
-        friendPrayerId: sourceId,
-      });
+      // Check if a removed copy exists — reactivate it instead of creating a new one
+      const removedCopy = (myPrayers || []).find(p =>
+        (p.originalPrayerId === sourceId || p.sourcePrayerId === sourceId || p.friendPrayerId === sourceId) &&
+        p.status === "removed"
+      );
+      if (removedCopy) {
+        await updateDoc(doc(db, "prayers", removedCopy.id), { status: "active" });
+      } else {
+        await addPrayer({
+          title: prayer.title || "",
+          note: prayer.note || "",
+          category: prayer.category || "General",
+          categories: prayer.categories || (prayer.category ? [prayer.category] : []),
+          date: prayer.date || "",
+          dateTag: prayer.dateTag || "",
+          shared: false,
+          isPrivate: true,
+          isPublic: false,
+          held: true,
+          isHeldPrayer: true,
+          readOnly: true,
+          fromFriend: true,
+          ownerId: friend.uid || prayer.userId || null,
+          heldForUserId: friend.uid || prayer.userId || null,
+          ownerName: friend.displayName || prayer.ownerName || "Friend",
+          sourcePrayerId: sourceId,
+          originalPrayerId: sourceId,
+          friendPrayerId: sourceId,
+        });
+      }
 
       heldSourceIds.add(sourceId);
       added += 1;
@@ -1587,9 +1601,52 @@ function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequest
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{friend.prayers?.length || 0} shared prayer{(friend.prayers?.length || 0) !== 1 ? "s" : ""}</div>
             </div>
           </div>
-          {(friend.prayers || []).map(p => (
-            <PrayerCard key={p.id} prayer={p} mine={false} myPrayingIds={prayingIds} onTogglePraying={() => togglePraying(p)} />
-          ))}
+          {(friend.prayers || []).map(p => {
+            const sourceId = p.originalPrayerId || p.sourcePrayerId || p.friendPrayerId || p.id;
+            const alreadyAdded = (myPrayers || []).some(mp =>
+              (mp.originalPrayerId === sourceId || mp.sourcePrayerId === sourceId || mp.friendPrayerId === sourceId) &&
+              mp.status === "active"
+            );
+            return (
+              <PrayerCard
+                key={p.id}
+                prayer={p}
+                mine={false}
+                myPrayingIds={prayingIds}
+                onTogglePraying={() => togglePraying(p)}
+                alreadyAdded={alreadyAdded}
+                onAddToList={async () => {
+                  const removedCopy = (myPrayers || []).find(mp =>
+                    (mp.originalPrayerId === sourceId || mp.sourcePrayerId === sourceId || mp.friendPrayerId === sourceId) &&
+                    mp.status === "removed"
+                  );
+                  if (removedCopy) {
+                    await updateDoc(doc(db, "prayers", removedCopy.id), { status: "active" });
+                  } else {
+                    await addPrayer({
+                      title: p.title || "",
+                      note: p.note || "",
+                      categories: p.categories || [],
+                      shared: false,
+                      isPrivate: true,
+                      isPublic: false,
+                      held: true,
+                      isHeldPrayer: true,
+                      readOnly: true,
+                      fromFriend: true,
+                      ownerId: friend.uid || p.userId || null,
+                      heldForUserId: friend.uid || p.userId || null,
+                      ownerName: friend.displayName || p.ownerName || "Friend",
+                      sourcePrayerId: sourceId,
+                      originalPrayerId: sourceId,
+                      friendPrayerId: sourceId,
+                    });
+                  }
+                  showToast("Added to Holding for Others");
+                }}
+              />
+            );
+          })}
           {(!friend.prayers || friend.prayers.length === 0) && (
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, padding: "10px 0", fontStyle: "italic" }}>No public prayers shared yet.</div>
           )}
@@ -2427,8 +2484,20 @@ export default function App() {
     if (!user) { setPrayers([]); setLoadingPrayers(false); return; }
     setLoadingPrayers(true);
     const q = query(collection(db, "prayers"), where("userId", "==", user.uid));
-    const unsub = onSnapshot(q, (snapshot) => {
+    const unsub = onSnapshot(q, async (snapshot) => {
       const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Sync answered status: check if any active held prayers have an original that is now answered
+      const activeHeld = data.filter(p => p.fromFriend && p.status === "active" && p.originalPrayerId);
+      for (const held of activeHeld) {
+        try {
+          const originalSnap = await getDoc(doc(db, "prayers", held.originalPrayerId));
+          if (originalSnap.exists() && originalSnap.data().status === "answered") {
+            await updateDoc(doc(db, "prayers", held.id), { status: "answered" });
+          }
+        } catch (e) {
+          // silently ignore if we can't read the original
+        }
+      }
       setPrayers(data);
       setLoadingPrayers(false);
     });
@@ -2445,7 +2514,17 @@ export default function App() {
         if (!snap.exists()) return null;
         const profile = { uid: snap.id, ...snap.data() };
         const prayerSnap = await getDocs(query(collection(db, "prayers"), where("userId", "==", uid), where("isPublic", "==", true)));
-        profile.prayers = prayerSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p.status === "active");
+        const allFriendPrayers = prayerSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const answeredOrRemovedIds = new Set((prayers || []).filter(p => p.originalPrayerId && (p.status === "answered" || p.status === "removed")).map(p => p.originalPrayerId));
+        // Sync held copies: if original is answered, mark our held copy as answered too
+        const answeredOriginalIds = allFriendPrayers.filter(p => p.status === "answered").map(p => p.id);
+        for (const originalId of answeredOriginalIds) {
+          const heldCopy = (prayers || []).find(p => p.originalPrayerId === originalId && p.status === "active");
+          if (heldCopy) {
+            await updateDoc(doc(db, "prayers", heldCopy.id), { status: "answered" });
+          }
+        }
+        profile.prayers = allFriendPrayers.filter(p => p.status === "active" && !p.fromFriend && !p.originalPrayerId && !p.sourcePrayerId && !p.friendPrayerId && !answeredOrRemovedIds.has(p.id));
         return profile;
       }));
       return profiles.filter(Boolean);
