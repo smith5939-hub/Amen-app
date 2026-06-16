@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, indexedDBLocalPersistence, initializeAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getMessaging } from "firebase/messaging";
 import { getFunctions } from "firebase/functions";
@@ -15,8 +15,13 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+export const auth = initializeAuth(app, {
+  persistence: indexedDBLocalPersistence
+});
 export const db = getFirestore(app);
-export const messaging = getMessaging(app);
 export const functions = getFunctions(app);
+
+// Only initialize messaging in browser context (not in Capacitor WebView)
+export const messaging = ('serviceWorker' in navigator) ? getMessaging(app) : null;
+
 export const VAPID_KEY = "BF-2HBBoPsX8o_EMeKZTFnUB-NPaBMcLAs7ekaGYSENuu3JDPDCl2wJ4HM5kFVw4YxZwX7t1WnDO7uXxnKyoTz0";

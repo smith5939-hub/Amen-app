@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext } from "react";
 import { auth, db, functions } from "./firebase";
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "firebase/auth";
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, signInWithCredential } from "firebase/auth";
+import { SocialLogin } from "@capgo/capacitor-social-login";
 import {
   addDoc,
   collection,
@@ -1243,10 +1244,26 @@ function SignIn() {
     setLoading(true);
     setError(null);
     try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: "select_account" });
-      await signInWithPopup(auth, provider);
+      const isNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+      if (isNative) {
+        await SocialLogin.initialize({
+          google: {
+            webClientId: "1051687728666-dg08ekiuui1rpo24nhqapfleqpo9t2g4.apps.googleusercontent.com",
+            iOSClientId: "1051687728666-qqp4ncsccjfpj71u4d3prkmhtqitpnf9.apps.googleusercontent.com"
+          }
+        });
+        const result = await SocialLogin.login({ provider: "google", options: { scopes: ["profile", "email"] } });
+        const idToken = result?.result?.idToken;
+        if (!idToken) throw new Error("No ID token returned");
+        const credential = GoogleAuthProvider.credential(idToken);
+        await signInWithCredential(auth, credential);
+      } else {
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: "select_account" });
+        await signInWithPopup(auth, provider);
+      }
     } catch (e) {
+      console.error("Sign in error:", e);
       setError("Sign in failed. Please try again.");
       setLoading(false);
     }
@@ -2439,7 +2456,12 @@ export default function App() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
+    // Timeout fallback: if Firebase doesn't respond in 5s, show sign-in screen
+    const timeout = setTimeout(() => {
+      setUser(prev => prev === undefined ? null : prev);
+    }, 5000);
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      clearTimeout(timeout);
       if (firebaseUser) {
         await syncLatestGoogleProfileToFirestore(firebaseUser);
       }
@@ -2456,8 +2478,9 @@ export default function App() {
           date: todayStr,
           createdAt: new Date().toISOString(),
         }, { merge: true });
-// Bucket 3 — Web Push subscription
+// Bucket 3 — Web Push subscription (skip in Capacitor native app)
         try {
+          if (!('serviceWorker' in navigator)) throw new Error('SW not supported');
           const swReg = await navigator.serviceWorker.ready;
           const permission = await Notification.requestPermission();
           if (permission === "granted") {

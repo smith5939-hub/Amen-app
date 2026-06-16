@@ -1,0 +1,13 @@
+{
+  "appId": "com.liftprayer.app",
+  "appName": "LIFT",
+  "webDir": "dist",
+  "plugins": {
+    "SocialLogin": {
+      "google": {
+        "webClientId": "1051687728666-dg08ekiuui1rpo24nhqapfleqpo9t2g4.apps.googleusercontent.com",
+        "iOSClientId": "1051687728666-qqp4ncsccjfpj71u4d3prkmhtqitpnf9.apps.googleusercontent.com"
+      }
+    }
+  }
+}
