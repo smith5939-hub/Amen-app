@@ -1270,7 +1270,7 @@ function SignIn() {
       }
     } catch (e) {
       console.error("Sign in error:", e);
-      setError("Sign in failed. Please try again.");
+      setError(`Sign in failed: ${e.code || e.message || JSON.stringify(e)}`);
       setLoading(false);
     }
   };
