@@ -1,6 +1,6 @@
 import { useState, useEffect, createContext, useContext } from "react";
 import { auth, db, functions } from "./firebase";
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, signInWithCredential } from "firebase/auth";
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, GoogleAuthProvider, signOut, signInWithCredential, getRedirectResult } from "firebase/auth";
 import { SocialLogin } from "@capgo/capacitor-social-login";
 import {
   addDoc,
@@ -1261,7 +1261,12 @@ function SignIn() {
       } else {
         const provider = new GoogleAuthProvider();
         provider.setCustomParameters({ prompt: "select_account" });
-        await signInWithPopup(auth, provider);
+        const isAndroid = isNative && window.Capacitor.getPlatform() === 'android';
+        if (isAndroid) {
+          await signInWithRedirect(auth, provider);
+        } else {
+          await signInWithPopup(auth, provider);
+        }
       }
     } catch (e) {
       console.error("Sign in error:", e);
