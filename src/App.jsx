@@ -238,7 +238,7 @@ function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToLi
           {prayer.fromFriend && (
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.sageDark, fontWeight: 500, marginBottom: 1 }}>{(friends.find(f => f.uid === prayer.userId)?.displayName) || prayer.ownerName || "Friend"}'s Prayer</div>
           )}
-          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, fontSize: 16, color: covered ? T.inkLight : T.ink, lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: covered ? "line-through" : "none", textDecorationColor: T.sageLight }}>
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, fontSize: 16, color: covered ? T.inkLight : T.ink, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textDecoration: covered ? "line-through" : "none", textDecorationColor: T.sageLight }}>
             {prayer.title}
           </div>
         </div>
@@ -2665,7 +2665,7 @@ export default function App() {
       <FontLink />
       <ToastProvider>
         <div style={{ minHeight: "100vh", background: T.cream }}>
-          <div style={{ position: "sticky", top: 0, zIndex: 90, background: T.cream, padding: "12px 20px 10px", borderBottom: `1px solid ${T.parchment}`, display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 480, margin: "0 auto", width: "100%" }}>
+          <div style={{ position: "sticky", top: 0, zIndex: 90, background: T.cream, padding: "12px 20px 10px", paddingTop: "calc(env(safe-area-inset-top) + 12px)", borderBottom: `1px solid ${T.parchment}`, display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 480, margin: "0 auto", width: "100%" }}>
             <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 24, fontWeight: 600, color: T.sageDark, letterSpacing: 3 }}>LIFT</span>
             <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 0.5 }}>
               <span style={{ color: T.sageDark }}>L</span><span style={{ color: T.inkLight, fontWeight: 300 }}>og </span>
