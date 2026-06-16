@@ -2430,7 +2430,7 @@ function NavIcon({ type, active }) {
 
 function BottomNav({ active, setActive, requestCount }) {
   return (
-    <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: T.white, borderTop: `1px solid ${T.parchment}`, display: "flex", zIndex: 100 }}>
+    <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: T.white, borderTop: `1px solid ${T.parchment}`, display: "flex", zIndex: 100, paddingBottom: "env(safe-area-inset-bottom)" }}>
       {TABS.map(t => (
         <button key={t.id} onClick={() => setActive(t.id)} style={{ flex: 1, border: "none", background: "none", cursor: "pointer", padding: "10px 4px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, position: "relative" }}>
           <NavIcon type={t.icon} active={active === t.id} />
@@ -2664,7 +2664,7 @@ export default function App() {
     <>
       <FontLink />
       <ToastProvider>
-        <div style={{ minHeight: "100vh", background: T.cream }}>
+        <div style={{ minHeight: "100vh", background: T.cream, paddingBottom: "calc(env(safe-area-inset-bottom) + 70px)" }}>
           <div style={{ position: "sticky", top: 0, zIndex: 90, background: T.cream, padding: "12px 20px 10px", paddingTop: "calc(env(safe-area-inset-top) + 12px)", borderBottom: `1px solid ${T.parchment}`, display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 480, margin: "0 auto", width: "100%" }}>
             <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 24, fontWeight: 600, color: T.sageDark, letterSpacing: 3 }}>LIFT</span>
             <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, letterSpacing: 0.5 }}>
