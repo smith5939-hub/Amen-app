@@ -1245,7 +1245,8 @@ function SignIn() {
     setError(null);
     try {
       const isNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
-      if (isNative) {
+      const isIOS = isNative && window.Capacitor.getPlatform() === 'ios';
+      if (isIOS) {
         await SocialLogin.initialize({
           google: {
             webClientId: "1051687728666-dg08ekiuui1rpo24nhqapfleqpo9t2g4.apps.googleusercontent.com",
