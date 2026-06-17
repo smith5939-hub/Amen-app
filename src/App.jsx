@@ -4,6 +4,8 @@ import { onAuthStateChanged, signInWithPopup, signInWithRedirect, GoogleAuthProv
 import { SocialLogin } from "@capgo/capacitor-social-login";
 import {
   addDoc,
+  arrayUnion,
+  arrayRemove,
   collection,
   deleteDoc,
   doc,
@@ -189,7 +191,8 @@ function CategoryPill({ cat }) {
 }
 
 function Avatar({ initials, photoURL, size = 36 }) {
-  if (photoURL) return <img src={photoURL} alt="avatar" style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />;
+  const [imgError, setImgError] = useState(false);
+  if (photoURL && !imgError) return <img src={photoURL} alt="avatar" onError={() => setImgError(true)} style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />;
   return <div style={{ width: size, height: size, borderRadius: "50%", background: T.sageLight, display: "flex", alignItems: "center", justifyContent: "center", color: T.sageDark, fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: size * 0.38, flexShrink: 0 }}>{initials}</div>;
 }
 
@@ -331,7 +334,7 @@ function CelebrationScreen({ prayer, onComplete }) {
   );
 }
 
-function AddPrayerModal({ onClose, onAdd, editPrayer = null, friends = [], defaultPublic = true }) {
+function AddPrayerModal({ onClose, onAdd, editPrayer = null, friends = [], defaultPublic = true, circles = [] }) {
   const isEdit = !!editPrayer;
   const initialCats = editPrayer ? (Array.isArray(editPrayer.categories) ? editPrayer.categories : [editPrayer.categories]) : ["Family"];
   const [title, setTitle] = useState(editPrayer?.title || "");
@@ -339,6 +342,8 @@ function AddPrayerModal({ onClose, onAdd, editPrayer = null, friends = [], defau
   const [selectedCats, setSelectedCats] = useState(initialCats);
   const [customCat, setCustomCat] = useState("");
   const [isPublic, setIsPublic] = useState(editPrayer ? editPrayer.isPublic : defaultPublic);
+  const [selectedCircles, setSelectedCircles] = useState(editPrayer?.sharedToCircles || []);
+  const toggleCircle = (id) => setSelectedCircles(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const [prayerDate, setPrayerDate] = useState(editPrayer?.prayerDate || "");
   const cats = Object.keys(CAT_COLORS);
   const toggleCat = (c) => setSelectedCats(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
@@ -349,7 +354,7 @@ function AddPrayerModal({ onClose, onAdd, editPrayer = null, friends = [], defau
   const submit = () => {
     if (!title.trim()) return;
     const finalCats = selectedCats.length ? selectedCats : ["Other"];
-    onAdd({ title: title.trim(), note, categories: finalCats, isPublic, prayerDate });
+    onAdd({ title: title.trim(), note, categories: finalCats, isPublic, prayerDate, sharedToCircles: selectedCircles });
   };
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "flex-end" }}>
@@ -380,11 +385,42 @@ function AddPrayerModal({ onClose, onAdd, editPrayer = null, friends = [], defau
           <input style={{ ...inputStyle, marginBottom: 0, flex: 1 }} placeholder="Add a custom category..." value={customCat} onChange={e => setCustomCat(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addCustomCat(); }} />
           <Btn small variant="secondary" onClick={addCustomCat} style={{ flexShrink: 0 }}>Add</Btn>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-          <div onClick={() => setIsPublic(!isPublic)} style={{ width: 44, height: 24, borderRadius: 12, background: isPublic ? T.sage : T.parchment, cursor: "pointer", position: "relative", flexShrink: 0 }}>
-            <div style={{ position: "absolute", top: 3, left: isPublic ? 22 : 3, width: 18, height: 18, borderRadius: "50%", background: T.white, transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }} />
-          </div>
-          <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight }}>{isPublic ? "Public — friends can see & pray" : "Private — just for you. Toggle to share with friends."}</span>
+        <label style={labelStyle}>Who can see this?</label>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+          {/* Only Me — exclusive option */}
+          <button onClick={() => { setIsPublic(false); setSelectedCircles([]); }} style={{ display: "flex", alignItems: "center", gap: 10, border: `1.5px solid ${!isPublic && selectedCircles.length === 0 ? T.sageDark : T.parchment}`, background: !isPublic && selectedCircles.length === 0 ? T.sageLight : T.white, borderRadius: 12, padding: "10px 14px", cursor: "pointer", textAlign: "left" }}>
+            <span style={{ fontSize: 18 }}>🔒</span>
+            <div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 500, color: T.ink }}>Only me</div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight }}>Private — only you can see this</div>
+            </div>
+            {!isPublic && selectedCircles.length === 0 && <span style={{ marginLeft: "auto", color: T.sageDark, fontSize: 16 }}>✓</span>}
+          </button>
+          {/* Divider */}
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, padding: "2px 4px" }}>Or share with any combination:</div>
+          {/* Friends — toggleable */}
+          <button onClick={() => { setIsPublic(prev => !prev); if (selectedCircles.length === 0 && isPublic) setSelectedCircles([]); }} style={{ display: "flex", alignItems: "center", gap: 10, border: `1.5px solid ${isPublic ? T.sageDark : T.parchment}`, background: isPublic ? T.sageLight : T.white, borderRadius: 12, padding: "10px 14px", cursor: "pointer", textAlign: "left" }}>
+            <span style={{ fontSize: 18 }}>👥</span>
+            <div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 500, color: T.ink }}>Friends</div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight }}>Shared to your community feed</div>
+            </div>
+            {isPublic && <span style={{ marginLeft: "auto", color: T.sageDark, fontSize: 16 }}>✓</span>}
+          </button>
+          {/* Circles — each independently toggleable */}
+          {circles.map(circle => {
+            const on = selectedCircles.includes(circle.id);
+            return (
+              <button key={circle.id} onClick={() => { toggleCircle(circle.id); }} style={{ display: "flex", alignItems: "center", gap: 10, border: `1.5px solid ${on ? T.sageDark : T.parchment}`, background: on ? T.sageLight : T.white, borderRadius: 12, padding: "10px 14px", cursor: "pointer", textAlign: "left" }}>
+                <span style={{ fontSize: 18 }}>{circle.emoji}</span>
+                <div>
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 500, color: T.ink }}>{circle.name}</div>
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight }}>Shared to this circle</div>
+                </div>
+                {on && <span style={{ marginLeft: "auto", color: T.sageDark, fontSize: 16 }}>✓</span>}
+              </button>
+            );
+          })}
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <Btn style={{ flex: 1 }} onClick={submit}>{isEdit ? "Save Changes" : "Add Prayer"}</Btn>
@@ -465,7 +501,7 @@ function SortablePrayerCard({ id, title, children }) {
   );
 }
 
-function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, firstName, defaultPublic, currentUser }) {
+function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, firstName, defaultPublic, currentUser, circles = [] }) {
   const showToast = useToast();
   const [showAdd, setShowAdd] = useState(false);
   const [answerTarget, setAnswerTarget] = useState(null);
@@ -532,11 +568,11 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
   const heldForOthers = shown.filter(p => p.fromFriend && p.status !== "answered" && p.status !== "removed");
   const coveredCount = coveredIds.filter(id => shown.find(p => p.id === id)).length;
 
-  const handleAdd = async ({ title, note, categories, isPublic, prayerDate }) => {
+  const handleAdd = async ({ title, note, categories, isPublic, prayerDate, sharedToCircles }) => {
     const myActivePrayers = prayers.filter(p => !p.fromFriend && p.status === "active");
     const maxSortOrder = Math.max(0, ...myActivePrayers.map(p => Number(p.sortOrder) || 0));
 
-    await addPrayer({ title, note, categories, isPublic, prayerDate, sortOrder: maxSortOrder + 1000 });
+    await addPrayer({ title, note, categories, isPublic, prayerDate, sortOrder: maxSortOrder + 1000, sharedToCircles: sharedToCircles || [] });
     setShowAdd(false);
     showToast("Prayer added");
   };
@@ -832,8 +868,8 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
           {heldForOthers.map(p => renderCard(p, false))}
         </>
       )}
-      {showAdd && <AddPrayerModal onClose={() => setShowAdd(false)} onAdd={handleAdd} friends={friends} defaultPublic={defaultPublic} />}
-      {editTarget && <AddPrayerModal onClose={() => setEditTarget(null)} onAdd={handleSave} editPrayer={editTarget} friends={friends} defaultPublic={defaultPublic} />}
+      {showAdd && <AddPrayerModal onClose={() => setShowAdd(false)} onAdd={handleAdd} friends={friends} defaultPublic={defaultPublic} circles={circles} />}
+      {editTarget && <AddPrayerModal onClose={() => setEditTarget(null)} onAdd={handleSave} editPrayer={editTarget} friends={friends} defaultPublic={defaultPublic} circles={circles} />}
       {answerTarget && <AnswerModal prayer={answerTarget} onClose={() => setAnswerTarget(null)} onConfirm={handleAnswer} />}
       {celebrationPrayer && <CelebrationScreen prayer={celebrationPrayer} onComplete={() => setCelebrationPrayer(null)} />}
     </div>
@@ -1040,7 +1076,7 @@ function TestimonyModal({ prayer, onClose }) {
   );
 }
 
-function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) {
+function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut, currentUser, unreadCount }) {
   const showToast = useToast();
   const [remindersOn, setRemindersOn] = useState(true);
   const [reminderTimes, setReminderTimes] = useState(["morning"]);
@@ -1050,6 +1086,23 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
   const [testimonies, setTestimonies] = useState([]);
   const [showTestimonies, setShowTestimonies] = useState(false);
   const [viewTestimony, setViewTestimony] = useState(null);
+  const [showNotifs, setShowNotifs] = useState(false);
+  const [notifs, setNotifs] = useState([]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const q = query(collection(db, "notifications"), where("toUid", "==", currentUser.uid));
+    const unsub = onSnapshot(q, (snap) => {
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(n => !n.dismissed).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setNotifs(data);
+    });
+    return unsub;
+  }, [currentUser]);
+
+  const dismissNotif = async (id) => {
+    await updateDoc(doc(db, "notifications", id), { read: true, dismissed: true });
+    setNotifs(prev => prev.filter(n => n.id !== id));
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -1121,7 +1174,71 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut }) 
 
   return (
     <div style={tabContent}>
-      <div style={{ marginBottom: 24 }}><div style={pageTitle}>Profile</div></div>
+      <div style={{ marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={pageTitle}>Profile</div>
+        <button onClick={() => setShowNotifs(v => !v)} style={{ position: "relative", border: "none", background: "none", cursor: "pointer", padding: 8 }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={showNotifs ? T.sageDark : T.inkLight} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          </svg>
+          {notifs.filter(n => !n.read).length > 0 && (
+            <div style={{ position: "absolute", top: 4, right: 4, width: 16, height: 16, borderRadius: "50%", background: T.dustyRose, color: T.white, fontSize: 9, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {notifs.filter(n => !n.read).length}
+            </div>
+          )}
+        </button>
+      </div>
+
+      {showNotifs && (
+        <div style={{ marginBottom: 24, background: T.parchment, borderRadius: 16, padding: "16px", border: `1px solid ${T.sage}` }}>
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: T.ink, marginBottom: 12 }}>Notifications</div>
+          {notifs.length === 0 && (
+            <div style={{ textAlign: "center", padding: "20px 0" }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>🔔</div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>No notifications yet</div>
+            </div>
+          )}
+          {notifs.map(n => (
+            <div key={n.id} style={{ background: T.white, borderRadius: 12, padding: "12px 14px", marginBottom: 8, borderLeft: `4px solid ${n.read ? T.parchment : T.sage}`, display: "flex", gap: 12, alignItems: "flex-start" }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 14, color: T.ink, marginBottom: 2 }}>{n.title}</div>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, lineHeight: 1.5 }}>{n.body}</div>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, marginTop: 4 }}>{n.createdAt ? fmt(n.createdAt) : ""}</div>
+                {n.type === "circle_invite" && !n.accepted && !n.declined && (
+                  <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                    <button onClick={async () => {
+                      await updateDoc(doc(db, "circles", n.circleId), {
+                        members: arrayUnion(currentUser.uid),
+                        [`memberDetails.${currentUser.uid}`]: {
+                          name: currentUser.displayName || "Me",
+                          photoURL: currentUser.photoURL || null,
+                          joinedAt: new Date().toISOString(),
+                        }
+                      });
+                      await updateDoc(doc(db, "notifications", n.id), { read: true, accepted: true, dismissed: false });
+                      setNotifs(prev => prev.map(x => x.id === n.id ? { ...x, accepted: true } : x));
+                    }} style={{ border: "none", background: T.sageDark, color: T.white, borderRadius: 10, padding: "6px 16px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", fontWeight: 500 }}>
+                      Accept
+                    </button>
+                    <button onClick={async () => {
+                      await updateDoc(doc(db, "notifications", n.id), { read: true, declined: true, dismissed: true });
+                      setNotifs(prev => prev.filter(x => x.id !== n.id));
+                    }} style={{ border: `1px solid ${T.parchment}`, background: "none", color: T.inkLight, borderRadius: 10, padding: "6px 16px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}>
+                      Decline
+                    </button>
+                  </div>
+                )}
+                {n.type === "circle_invite" && n.accepted && (
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.sageDark, marginTop: 6, fontWeight: 500 }}>✓ Joined {n.circleName}</div>
+                )}
+              </div>
+              {!(n.type === "circle_invite" && !n.accepted && !n.declined) && (
+                <button onClick={() => dismissNotif(n.id)} style={{ border: "none", background: "none", cursor: "pointer", color: T.inkLight, fontSize: 16, padding: "0 4px", flexShrink: 0 }}>✕</button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 28 }}>
         <Avatar initials={(user?.displayName || "Me").split(" ").map(n => n[0]).join("").slice(0, 2)} photoURL={user?.photoURL} size={60} />
         <div>
@@ -1304,6 +1421,117 @@ function EncouragementModal({ prayer, prayerName, onSend, onSkip }) {
           <Btn variant="ghost" onClick={onSkip}>Skip</Btn>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Friend Menu (defriend, block, report) ─────────────────────────────────────
+function FriendMenu({ friend, currentUser, showToast }) {
+  const [open, setOpen] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [confirming, setConfirming] = useState(null);
+
+  const REPORT_REASONS = [
+    "Inappropriate content",
+    "Harassment or bullying",
+    "Spam",
+    "Fake account",
+    "Other",
+  ];
+
+  const defriend = async () => {
+    try {
+      const [snap1, snap2] = await Promise.all([
+        getDocs(query(collection(db, "friendRequests"), where("fromUid", "==", currentUser.uid), where("toUid", "==", friend.uid), where("status", "==", "accepted"))),
+        getDocs(query(collection(db, "friendRequests"), where("fromUid", "==", friend.uid), where("toUid", "==", currentUser.uid), where("status", "==", "accepted"))),
+      ]);
+      const all = [...snap1.docs, ...snap2.docs];
+      for (const d of all) await updateDoc(doc(db, "friendRequests", d.id), { status: "removed" });
+      showToast("Friend removed");
+      setOpen(false);
+    } catch (err) {
+      showToast("Could not remove friend");
+    }
+  };
+
+  const block = async () => {
+    try {
+      await addDoc(collection(db, "blocks"), {
+        blockedBy: currentUser.uid,
+        blockedUid: friend.uid,
+        createdAt: new Date().toISOString(),
+      });
+      await defriend();
+      showToast("User blocked");
+      setOpen(false);
+    } catch (err) {
+      showToast("Could not block user");
+    }
+  };
+
+  const report = async () => {
+    if (!reportReason) return;
+    try {
+      await addDoc(collection(db, "reports"), {
+        reportedBy: currentUser.uid,
+        reportedUid: friend.uid,
+        reportedName: friend.displayName || "Unknown",
+        reason: reportReason,
+        createdAt: new Date().toISOString(),
+      });
+      showToast("Report submitted. Thank you.");
+      setShowReport(false);
+      setOpen(false);
+    } catch (err) {
+      showToast("Could not submit report");
+    }
+  };
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button onClick={() => setOpen(v => !v)} style={{ border: "none", background: "none", cursor: "pointer", color: T.inkLight, fontSize: 20, padding: "4px 6px", lineHeight: 1 }}>⋯</button>
+      {open && (
+        <div style={{ position: "absolute", right: 0, top: 28, background: T.white, borderRadius: 12, border: `1px solid ${T.parchment}`, boxShadow: "0 4px 16px rgba(0,0,0,0.1)", zIndex: 500, minWidth: 160, overflow: "hidden" }}>
+          {confirming === "defriend" ? (
+            <div style={{ padding: "12px 14px" }}>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.ink, marginBottom: 10 }}>Remove {friend.displayName?.split(" ")[0]}?</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={defriend} style={{ flex: 1, border: "none", background: "#c0392b", color: T.white, borderRadius: 8, padding: "6px 0", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}>Remove</button>
+                <button onClick={() => setConfirming(null)} style={{ flex: 1, border: `1px solid ${T.parchment}`, background: "none", borderRadius: 8, padding: "6px 0", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", color: T.inkLight }}>Cancel</button>
+              </div>
+            </div>
+          ) : confirming === "block" ? (
+            <div style={{ padding: "12px 14px" }}>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.ink, marginBottom: 10 }}>Block {friend.displayName?.split(" ")[0]}? They won't be able to see your prayers or contact you.</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={block} style={{ flex: 1, border: "none", background: "#c0392b", color: T.white, borderRadius: 8, padding: "6px 0", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}>Block</button>
+                <button onClick={() => setConfirming(null)} style={{ flex: 1, border: `1px solid ${T.parchment}`, background: "none", borderRadius: 8, padding: "6px 0", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", color: T.inkLight }}>Cancel</button>
+              </div>
+            </div>
+          ) : showReport ? (
+            <div style={{ padding: "12px 14px" }}>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 500, color: T.ink, marginBottom: 10 }}>Report reason</div>
+              {REPORT_REASONS.map(r => (
+                <div key={r} onClick={() => setReportReason(r)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", cursor: "pointer", borderBottom: `1px solid ${T.parchment}` }}>
+                  <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${reportReason === r ? T.sageDark : T.parchment}`, background: reportReason === r ? T.sageDark : "transparent", flexShrink: 0 }} />
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.ink }}>{r}</div>
+                </div>
+              ))}
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                <button onClick={report} disabled={!reportReason} style={{ flex: 1, border: "none", background: reportReason ? "#c0392b" : T.parchment, color: T.white, borderRadius: 8, padding: "6px 0", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: reportReason ? "pointer" : "default" }}>Submit</button>
+                <button onClick={() => { setShowReport(false); setReportReason(""); }} style={{ flex: 1, border: `1px solid ${T.parchment}`, background: "none", borderRadius: 8, padding: "6px 0", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", color: T.inkLight }}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button onClick={() => setConfirming("defriend")} style={{ width: "100%", border: "none", background: "none", padding: "11px 14px", textAlign: "left", fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.ink, cursor: "pointer", display: "block" }}>Remove friend</button>
+              <button onClick={() => setConfirming("block")} style={{ width: "100%", border: "none", background: "none", padding: "11px 14px", textAlign: "left", fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#c0392b", cursor: "pointer", borderTop: `1px solid ${T.parchment}`, display: "block" }}>Block</button>
+              <button onClick={() => setShowReport(true)} style={{ width: "100%", border: "none", background: "none", padding: "11px 14px", textAlign: "left", fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#c0392b", cursor: "pointer", borderTop: `1px solid ${T.parchment}`, display: "block" }}>Report</button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1623,6 +1851,7 @@ function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequest
               </div>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{friend.prayers?.length || 0} shared prayer{(friend.prayers?.length || 0) !== 1 ? "s" : ""}</div>
             </div>
+            <FriendMenu friend={friend} currentUser={currentUser} showToast={showToast} />
           </div>
           {(friend.prayers || []).map(p => {
             const sourceId = p.originalPrayerId || p.sourcePrayerId || p.friendPrayerId || p.id;
@@ -2367,11 +2596,479 @@ function Notifications({ currentUser }) {
   );
 }
 
+// ── Circles Tab ───────────────────────────────────────────────────────────────
+function CreateCircleModal({ onClose, onCreated, currentUser }) {
+  const [name, setName] = useState("");
+  const [emoji, setEmoji] = useState("🙏");
+  const [loading, setLoading] = useState(false);
+  const EMOJIS = ["🙏","🏠","⛪","✝️","❤️","🌿","🕊️","⭐","🔥","🌊","🎯","👨‍👩‍👧‍👦"];
+
+  const create = async () => {
+    if (!name.trim()) return;
+    setLoading(true);
+    try {
+      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const ref = await addDoc(collection(db, "circles"), {
+        name: name.trim(),
+        emoji,
+        createdBy: currentUser.uid,
+        createdAt: new Date().toISOString(),
+        members: [currentUser.uid],
+        memberDetails: {
+          [currentUser.uid]: {
+            name: currentUser.displayName || "Me",
+            photoURL: currentUser.photoURL || null,
+            joinedAt: new Date().toISOString(),
+          }
+        },
+        inviteCode: code,
+        prayerIds: [],
+      });
+      setLoading(false);
+      onCreated(ref.id);
+      onClose();
+    } catch (err) {
+      console.error("Error creating circle:", err);
+      alert("Could not create circle: " + err.message);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "flex-end" }}>
+      <div style={{ background: T.cream, borderRadius: "20px 20px 0 0", padding: "24px 20px 36px", width: "100%", maxWidth: 480, margin: "0 auto" }}>
+        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 24, fontWeight: 600, color: T.ink, marginBottom: 20 }}>Create a Circle</div>
+        <label style={labelStyle}>Circle name</label>
+        <input style={inputStyle} placeholder="e.g. Smith Family, Men's Bible Study..." value={name} onChange={e => setName(e.target.value)} />
+        <label style={labelStyle}>Choose an emoji</label>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+          {EMOJIS.map(e => (
+            <button key={e} onClick={() => setEmoji(e)} style={{ width: 40, height: 40, borderRadius: 10, border: `2px solid ${emoji === e ? T.sageDark : T.parchment}`, background: emoji === e ? T.sageLight : T.white, fontSize: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>{e}</button>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <Btn style={{ flex: 1 }} onClick={create} disabled={loading || !name.trim()}>{loading ? "Creating..." : "Create Circle"}</Btn>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function JoinCircleModal({ onClose, onJoined, currentUser }) {
+  const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const join = async () => {
+    if (!code.trim()) return;
+    setLoading(true);
+    setError("");
+    const q = query(collection(db, "circles"), where("inviteCode", "==", code.trim().toUpperCase()));
+    const snap = await getDocs(q);
+    if (snap.empty) { setError("No circle found with that code. Check and try again."); setLoading(false); return; }
+    const circleDoc = snap.docs[0];
+    const circleData = circleDoc.data();
+    if (circleData.members.includes(currentUser.uid)) { setError("You're already in this circle!"); setLoading(false); return; }
+    await updateDoc(doc(db, "circles", circleDoc.id), {
+      members: arrayUnion(currentUser.uid),
+      [`memberDetails.${currentUser.uid}`]: {
+        name: currentUser.displayName || "Me",
+        photoURL: currentUser.photoURL || null,
+        joinedAt: new Date().toISOString(),
+      }
+    });
+    setLoading(false);
+    onJoined(circleDoc.id);
+    onClose();
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "flex-end" }}>
+      <div style={{ background: T.cream, borderRadius: "20px 20px 0 0", padding: "24px 20px 36px", width: "100%", maxWidth: 480, margin: "0 auto" }}>
+        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 24, fontWeight: 600, color: T.ink, marginBottom: 20 }}>Join a Circle</div>
+        <label style={labelStyle}>Enter invite code</label>
+        <input style={{ ...inputStyle, textTransform: "uppercase", letterSpacing: 3, fontSize: 18 }} placeholder="e.g. ABC123" value={code} onChange={e => setCode(e.target.value)} maxLength={6} />
+        {error && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#c0392b", marginBottom: 12 }}>{error}</div>}
+        <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+          <Btn style={{ flex: 1 }} onClick={join} disabled={loading || !code.trim()}>{loading ? "Joining..." : "Join Circle"}</Btn>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CircleInviteModal({ circle, currentUser, friends, onClose, showToast }) {
+  const [tab, setTab] = useState("friends");
+  const [email, setEmail] = useState("");
+  const [adding, setAdding] = useState(null);
+  const [added, setAdded] = useState([]);
+
+  const nonMembers = friends.filter(f => !(circle.members || []).includes(f.uid));
+
+  const addFriend = async (friend) => {
+    setAdding(friend.uid);
+    try {
+      await addDoc(collection(db, "notifications"), {
+        toUid: friend.uid,
+        fromUid: currentUser.uid,
+        fromName: currentUser.displayName || "Someone",
+        type: "circle_invite",
+        title: `${currentUser.displayName || "Someone"} invited you to a prayer circle`,
+        body: `You've been invited to join "${circle.name}". Accept to see and pray for shared requests.`,
+        circleId: circle.id,
+        circleName: circle.name,
+        circleEmoji: circle.emoji,
+        read: false,
+        dismissed: false,
+        createdAt: new Date().toISOString(),
+      });
+      setAdded(prev => [...prev, friend.uid]);
+      showToast(`Invite sent to ${friend.displayName || "friend"}!`);
+    } catch (err) {
+      showToast("Could not send invite");
+    }
+    setAdding(null);
+  };
+
+  const sendEmailInvite = () => {
+    if (!email.trim()) return;
+    const subject = encodeURIComponent(`Join my prayer circle on LIFT`);
+    const body = encodeURIComponent(`Hey! I'd love for you to join my prayer circle "${circle.name}" on LIFT.
+
+Download the app at https://amen-app-two.vercel.app and use invite code: ${circle.inviteCode}
+
+Let's pray together!`);
+    window.open(`mailto:${email}?subject=${subject}&body=${body}`);
+    showToast("Email opened!");
+    setEmail("");
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 2000, display: "flex", alignItems: "flex-end" }}>
+      <div style={{ background: T.cream, borderRadius: "20px 20px 0 0", padding: "24px 20px 36px", width: "100%", maxWidth: 480, margin: "0 auto", maxHeight: "80vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, color: T.ink }}>Invite to {circle.name}</div>
+          <button onClick={onClose} style={{ border: "none", background: "none", fontSize: 20, cursor: "pointer", color: T.inkLight }}>✕</button>
+        </div>
+
+        <div style={{ display: "flex", gap: 0, marginBottom: 20, background: T.parchment, borderRadius: 12, padding: 4 }}>
+          {["friends", "email"].map(t => (
+            <button key={t} onClick={() => setTab(t)} style={{ flex: 1, border: "none", background: tab === t ? T.white : "transparent", borderRadius: 9, padding: "8px 0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", color: tab === t ? T.ink : T.inkLight, fontWeight: tab === t ? 500 : 400, cursor: "pointer" }}>
+              {t === "friends" ? "👥 From friends" : "✉️ Email invite"}
+            </button>
+          ))}
+        </div>
+
+        {tab === "friends" && (
+          <div>
+            {nonMembers.length === 0 && (
+              <div style={{ textAlign: "center", padding: "30px 0" }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>🙏</div>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>All your friends are already in this circle, or you have no friends added yet.</div>
+              </div>
+            )}
+            {nonMembers.map(friend => {
+              const isAdded = added.includes(friend.uid);
+              const isAdding = adding === friend.uid;
+              return (
+                <div key={friend.uid} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: `1px solid ${T.parchment}` }}>
+                  <Avatar initials={(friend.displayName || friend.name || "?").split(" ").map(n => n[0]).join("").slice(0,2)} photoURL={friend.photoURL} size={38} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.ink, fontWeight: 500 }}>{friend.displayName || friend.name}</div>
+                  </div>
+                  <button onClick={() => !isAdded && addFriend(friend)} style={{ border: "none", background: isAdded ? T.sageLight : T.sageDark, color: isAdded ? T.sageDark : T.white, borderRadius: 14, padding: "6px 14px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: isAdded ? "default" : "pointer", fontWeight: 500 }}>
+                    {isAdding ? "Adding..." : isAdded ? "✓ Added" : "Add"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {tab === "email" && (
+          <div>
+            <div style={{ background: T.sageLight, borderRadius: 12, padding: "12px 14px", marginBottom: 16, border: `1px solid ${T.sage}` }}>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, marginBottom: 4 }}>Circle invite code</div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 24, fontWeight: 700, color: T.sageDark, letterSpacing: 6 }}>{circle.inviteCode}</div>
+              <button onClick={() => { navigator.clipboard.writeText(circle.inviteCode); showToast("Code copied!"); }} style={{ border: "none", background: "none", color: T.sageDark, fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", padding: "4px 0", fontWeight: 500 }}>Copy code</button>
+            </div>
+            <label style={labelStyle}>Send invite email to</label>
+            <input style={inputStyle} type="email" placeholder="friend@email.com" value={email} onChange={e => setEmail(e.target.value)} />
+            <Btn style={{ width: "100%" }} onClick={sendEmailInvite} disabled={!email.trim()}>Open Email App</Btn>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CircleDetail({ circle, circleId, currentUser, onBack, friends = [] }) {
+  const [prayers, setPrayers] = useState([]);
+  const [filter, setFilter] = useState("All");
+  const [prayingIds, setPrayingIds] = useState([]);
+  const [showInvite, setShowInvite] = useState(false);
+  const showToast = useToast();
+
+  useEffect(() => {
+    if (!circle.prayerIds || circle.prayerIds.length === 0) { setPrayers([]); return; }
+    const fetchPrayers = async () => {
+      const chunks = [];
+      for (let i = 0; i < circle.prayerIds.length; i += 10) chunks.push(circle.prayerIds.slice(i, i + 10));
+      const results = [];
+      for (const chunk of chunks) {
+        const q = query(collection(db, "prayers"), where("__name__", "in", chunk));
+        const snap = await getDocs(q);
+        snap.docs.forEach(d => results.push({ id: d.id, ...d.data() }));
+      }
+      results.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setPrayers(results);
+    };
+    fetchPrayers();
+  }, [circle.prayerIds]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const fetchPraying = async () => {
+      const snap = await getDocs(query(collection(db, "prayingRecords"), where("prayingUserId", "==", currentUser.uid)));
+      setPrayingIds(snap.docs.map(d => d.data().prayerId));
+    };
+    fetchPraying();
+  }, [currentUser]);
+
+  const handlePray = async (prayer) => {
+    const alreadyPraying = prayingIds.includes(prayer.id);
+    if (alreadyPraying) {
+      const snap = await getDocs(query(collection(db, "prayingRecords"), where("prayingUserId", "==", currentUser.uid), where("prayerId", "==", prayer.id)));
+      for (const d of snap.docs) await deleteDoc(doc(db, "prayingRecords", d.id));
+      setPrayingIds(prev => prev.filter(id => id !== prayer.id));
+      showToast("Removed from praying");
+    } else {
+      await addDoc(collection(db, "prayingRecords"), {
+        prayingUserId: currentUser.uid,
+        prayerOwnerId: prayer.userId,
+        prayerId: prayer.id,
+        prayedAt: new Date().toISOString(),
+      });
+      setPrayingIds(prev => [...prev, prayer.id]);
+      showToast("🙏 Praying!");
+    }
+  };
+
+  const members = Object.entries(circle.memberDetails || {});
+  const categories = ["All", ...Array.from(new Set(prayers.flatMap(p => p.categories || []))),"Answered"];
+  const filtered = prayers.filter(p => {
+    if (filter === "Answered") return p.status === "answered";
+    if (filter === "All") return p.status === "active";
+    return p.status === "active" && (p.categories || []).includes(filter);
+  });
+  const answered = prayers.filter(p => p.status === "answered");
+
+  const getInitials = (name) => (name || "?").split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
+  const AVATAR_COLORS = ["#4a6741","#7a8c7b","#c4a882","#9b7fa6","#6b8fa8","#c4776a"];
+
+  return (
+    <div style={{ padding: "0 0 100px" }}>
+      <div style={{ background: T.cream, padding: "14px 16px 0", borderBottom: `1px solid ${T.parchment}` }}>
+        <button onClick={onBack} style={{ border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, color: T.sageDark, fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 500, marginBottom: 10, padding: 0 }}>
+          ← Circles
+        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, paddingBottom: 12 }}>
+          <div style={{ width: 48, height: 48, borderRadius: "50%", background: T.sageLight, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>{circle.emoji}</div>
+          <div>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, color: T.ink }}>{circle.name}</div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{members.length} member{members.length !== 1 ? "s" : ""} · {prayers.filter(p => p.status === "active").length} active · {answered.length} answered</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, paddingBottom: 12 }}>
+          {members.slice(0, 5).map(([uid, m], i) => (
+            <div key={uid} title={m.name} style={{ width: 28, height: 28, borderRadius: "50%", background: AVATAR_COLORS[i % AVATAR_COLORS.length], display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 500, color: "#fff", border: `2px solid ${T.cream}`, marginLeft: i > 0 ? -8 : 0, fontFamily: "'DM Sans', sans-serif" }}>
+              {getInitials(m.name)}
+            </div>
+          ))}
+          {members.length > 5 && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, marginLeft: 4 }}>+{members.length - 5} more</div>}
+          <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+            <button onClick={() => { setShowInvite(true); }} style={{ border: `1px solid ${T.sageDark}`, background: "none", borderRadius: 14, padding: "4px 12px", fontSize: 11, color: T.sageDark, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", fontWeight: 500 }}>+ Invite</button>
+            {circle.createdBy !== currentUser.uid && (
+              <button onClick={async () => {
+                if (!window.confirm("Leave this circle? You'll no longer see shared prayers.")) return;
+                await updateDoc(doc(db, "circles", circleId), {
+                  members: arrayRemove(currentUser.uid),
+                });
+                onBack();
+              }} style={{ border: `1px solid #c0392b`, background: "none", borderRadius: 14, padding: "4px 12px", fontSize: 11, color: "#c0392b", fontFamily: "'DM Sans', sans-serif", cursor: "pointer", fontWeight: 500 }}>Leave</button>
+            )}
+            {circle.createdBy === currentUser.uid && (
+              <button onClick={async () => {
+                if (!window.confirm("Delete this circle? This cannot be undone.")) return;
+                await deleteDoc(doc(db, "circles", circleId));
+                onBack();
+              }} style={{ border: `1px solid #c0392b`, background: "none", borderRadius: 14, padding: "4px 12px", fontSize: 11, color: "#c0392b", fontFamily: "'DM Sans', sans-serif", cursor: "pointer", fontWeight: 500 }}>Delete</button>
+            )}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 10 }}>
+          {categories.map(cat => (
+            <button key={cat} onClick={() => setFilter(cat)} style={{ flexShrink: 0, border: `1px solid ${filter === cat ? T.sageDark : T.parchment}`, background: filter === cat ? T.sageDark : "transparent", borderRadius: 14, padding: "4px 12px", fontSize: 11, color: filter === cat ? T.white : T.inkLight, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", fontWeight: filter === cat ? 500 : 400 }}>{cat}</button>
+          ))}
+        </div>
+      </div>
+
+      {showInvite && (
+        <CircleInviteModal
+          circle={circle}
+          currentUser={currentUser}
+          friends={friends}
+          onClose={() => setShowInvite(false)}
+          showToast={showToast}
+        />
+      )}
+
+      <div style={{ padding: "12px 16px 0" }}>
+        {filtered.length === 0 && (
+          <div style={{ textAlign: "center", padding: "40px 20px" }}>
+            <div style={{ fontSize: 32, marginBottom: 10 }}>🙏</div>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: T.ink, marginBottom: 6 }}>No prayers here yet</div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, lineHeight: 1.6 }}>When members share prayers to this circle, they'll appear here.</div>
+          </div>
+        )}
+        {filtered.map(p => {
+          const isPraying = prayingIds.includes(p.id);
+          const memberInfo = circle.memberDetails?.[p.userId];
+          const initials = getInitials(memberInfo?.name || p.ownerName || "?");
+          const memberIndex = members.findIndex(([uid]) => uid === p.userId);
+          const avatarColor = AVATAR_COLORS[memberIndex >= 0 ? memberIndex % AVATAR_COLORS.length : 0];
+          return (
+            <div key={p.id} style={{ background: T.white, borderRadius: 14, border: `1px solid ${T.parchment}`, padding: "14px", marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <div style={{ width: 24, height: 24, borderRadius: "50%", background: avatarColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 500, color: "#fff", fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>{initials}</div>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight }}>{memberInfo?.name || p.ownerName || "Member"}</div>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: T.inkLight, marginLeft: "auto" }}>{p.createdAt ? fmt(p.createdAt) : ""}</div>
+              </div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 500, color: T.ink, lineHeight: 1.4, marginBottom: 6, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{p.title}</div>
+              {(p.categories || []).length > 0 && (
+                <div style={{ display: "flex", gap: 4, marginBottom: 10, flexWrap: "wrap" }}>
+                  {(p.categories || []).map(cat => {
+                    const cc = catColor(cat);
+                    return <span key={cat} style={{ fontSize: 10, background: cc.bg, color: cc.text, borderRadius: 8, padding: "2px 7px", fontFamily: "'DM Sans', sans-serif" }}>{cat}</span>;
+                  })}
+                </div>
+              )}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button onClick={() => handlePray(p)} style={{ display: "flex", alignItems: "center", gap: 5, background: isPraying ? T.sageDark : T.sageLight, border: "none", borderRadius: 16, padding: "6px 12px", fontSize: 11, fontWeight: 500, color: isPraying ? T.white : T.sageDark, fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}>
+                  🙏 {isPraying ? "Praying" : "I'm Praying"}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+        {filter === "All" && answered.length > 0 && (
+          <div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 500, padding: "8px 0 6px" }}>Answered · {answered.length}</div>
+            {answered.map(p => (
+              <div key={p.id} style={{ background: T.white, borderRadius: 14, border: `1px solid ${T.parchment}`, borderLeft: `3px solid ${T.gold}`, padding: "12px 14px", marginBottom: 8, opacity: 0.8 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 500, color: T.ink }}>{p.title}</div>
+                  <span style={{ fontSize: 10, background: T.goldLight, color: T.gold, borderRadius: 8, padding: "2px 7px", fontFamily: "'DM Sans', sans-serif", fontWeight: 500, flexShrink: 0, marginLeft: 8 }}>✓ Answered</span>
+                </div>
+                {p.answeredNote && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, lineHeight: 1.5 }}>{p.answeredNote}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Circles({ currentUser, prayers: myPrayers, circles = [], friends = [] }) {
+  const [activeCircle, setActiveCircle] = useState(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [showJoin, setShowJoin] = useState(false);
+  const loading = false;
+
+  const getLatestPrayer = async (prayerIds) => {
+    if (!prayerIds || prayerIds.length === 0) return null;
+    const latestId = prayerIds[prayerIds.length - 1];
+    const snap = await getDoc(doc(db, "prayers", latestId));
+    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  };
+
+  if (activeCircle) {
+    const circle = circles.find(c => c.id === activeCircle);
+    if (!circle) return null;
+    return <CircleDetail circle={circle} circleId={activeCircle} currentUser={currentUser} onBack={() => setActiveCircle(null)} friends={friends} />;
+  }
+
+  return (
+    <div style={{ ...tabContent }}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={pageTitle}>Circles</div>
+        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>Your prayer communities</div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 20 }}>
+        <button onClick={() => setShowCreate(true)} style={{ border: "none", background: T.sageDark, borderRadius: 20, padding: "10px 0", fontSize: 13, fontWeight: 500, color: T.white, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+          + Create circle
+        </button>
+        <button onClick={() => setShowJoin(true)} style={{ border: `1.5px solid ${T.sageDark}`, background: "transparent", borderRadius: 20, padding: "10px 0", fontSize: 13, fontWeight: 500, color: T.sageDark, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+          Join circle
+        </button>
+      </div>
+
+      {loading && <div style={{ textAlign: "center", padding: "40px 0", fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight }}>Loading your circles...</div>}
+
+      {!loading && circles.length === 0 && (
+        <div style={{ textAlign: "center", padding: "50px 20px" }}>
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: "block", margin: "0 auto 14px" }}>
+          <circle cx="12" cy="7.5" r="4.2" stroke="#4a6741" strokeWidth="1.6" fill="none" />
+          <circle cx="8.2" cy="14.5" r="4.2" stroke="#4a6741" strokeWidth="1.6" fill="none" />
+          <circle cx="15.8" cy="14.5" r="4.2" stroke="#4a6741" strokeWidth="1.6" fill="none" />
+        </svg>
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, color: T.ink, marginBottom: 8 }}>No circles yet</div>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, lineHeight: 1.7, maxWidth: 260, margin: "0 auto" }}>Create a circle for your family, small group, or church team — and pray together.</div>
+        </div>
+      )}
+
+      {circles.map(circle => {
+        const members = Object.entries(circle.memberDetails || {});
+        const activePrayers = (circle.prayerIds || []).length;
+        const AVATAR_COLORS = ["#4a6741","#7a8c7b","#c4a882","#9b7fa6","#6b8fa8","#c4776a"];
+        const getInitials = (name) => (name || "?").split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
+        return (
+          <div key={circle.id} onClick={() => setActiveCircle(circle.id)} style={{ background: T.white, borderRadius: 16, border: `1px solid ${T.parchment}`, padding: "14px", marginBottom: 12, cursor: "pointer" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+              <div style={{ width: 44, height: 44, borderRadius: "50%", background: T.sageLight, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{circle.emoji}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 500, color: T.ink }}>{circle.name}</div>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, marginTop: 2 }}>{members.length} member{members.length !== 1 ? "s" : ""} · {activePrayers} prayer{activePrayers !== 1 ? "s" : ""}</div>
+              </div>
+              <span style={{ color: T.inkLight, fontSize: 16 }}>›</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              {members.slice(0, 5).map(([uid, m], i) => (
+                <div key={uid} title={m.name} style={{ width: 26, height: 26, borderRadius: "50%", background: AVATAR_COLORS[i % AVATAR_COLORS.length], display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 500, color: "#fff", border: `2px solid ${T.white}`, marginLeft: i > 0 ? -6 : 0, fontFamily: "'DM Sans', sans-serif" }}>
+                  {getInitials(m.name)}
+                </div>
+              ))}
+              {members.length > 5 && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: T.inkLight, marginLeft: 4 }}>+{members.length - 5}</div>}
+            </div>
+          </div>
+        );
+      })}
+
+      {showCreate && <CreateCircleModal onClose={() => setShowCreate(false)} onCreated={(id) => setActiveCircle(id)} currentUser={currentUser} />}
+      {showJoin && <JoinCircleModal onClose={() => setShowJoin(false)} onJoined={(id) => setActiveCircle(id)} currentUser={currentUser} />}
+    </div>
+  );
+}
+
 const TABS = [
-  { id: "prayers", icon: "prayers", label: "Prayers" },
   { id: "community", icon: "community", label: "Community" },
+  { id: "circles", icon: "circles", label: "Circles" },
+  { id: "prayers", icon: "prayers", label: "Prayer" },
   { id: "reflect", icon: "reflect", label: "Reflect" },
-  { id: "notifications", icon: "notifications", label: "Notifications" },
   { id: "profile", icon: "profile", label: "Profile" },
 ];
 
@@ -2390,8 +3087,44 @@ function NavIcon({ type, active }) {
   };
 
   if (type === "prayers") {
+    const isActive = active;
     return (
-      <img src="/praying-hands.png" alt="Prayers" style={{ width: 24, height: 24, objectFit: "contain", mixBlendMode: "multiply" }} />
+      <div style={{
+        width: 52,
+        height: 52,
+        borderRadius: "50%",
+        background: T.sageDark,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        marginTop: -18,
+        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+      }}>
+        <img
+          src="/praying-hands.png"
+          alt="Prayer"
+          style={{
+            width: 26,
+            height: 26,
+            objectFit: "contain",
+            filter: "brightness(0) invert(1)",
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (type === "circles") {
+    const c = active ? T.sageDark : T.inkLight;
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: "block" }}>
+        {/* Top circle */}
+        <circle cx="12" cy="7.5" r="4.2" stroke={c} strokeWidth="1.6" fill="none" />
+        {/* Bottom left circle */}
+        <circle cx="8.2" cy="14.5" r="4.2" stroke={c} strokeWidth="1.6" fill="none" />
+        {/* Bottom right circle */}
+        <circle cx="15.8" cy="14.5" r="4.2" stroke={c} strokeWidth="1.6" fill="none" />
+      </svg>
     );
   }
 
@@ -2417,15 +3150,6 @@ function NavIcon({ type, active }) {
     );
   }
 
-  if (type === "notifications") {
-    return (
-      <svg {...common}>
-        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-      </svg>
-    );
-  }
-
   return (
     <svg {...common}>
       <circle cx="12" cy="8" r="4" />
@@ -2434,17 +3158,23 @@ function NavIcon({ type, active }) {
   );
 }
 
-function BottomNav({ active, setActive, requestCount }) {
+function BottomNav({ active, setActive, requestCount, unreadCount }) {
   return (
     <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: T.white, borderTop: `1px solid ${T.parchment}`, display: "flex", zIndex: 100, paddingBottom: "env(safe-area-inset-bottom)" }}>
       {TABS.map(t => (
         <button key={t.id} onClick={() => setActive(t.id)} style={{ flex: 1, border: "none", background: "none", cursor: "pointer", padding: "10px 4px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, position: "relative" }}>
-          <NavIcon type={t.icon} active={active === t.id} />
-          {t.id === "notifications" && requestCount > 0 && (
-            <div style={{ position: "absolute", top: 6, right: "50%", transform: "translateX(8px)", width: 16, height: 16, borderRadius: "50%", background: T.dustyRose, color: T.white, fontSize: 9, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{requestCount}</div>
+          <div style={{ position: "relative" }}>
+            <NavIcon type={t.icon} active={active === t.id} />
+            {t.id === "profile" && unreadCount > 0 && (
+              <div style={{ position: "absolute", top: -2, right: -4, width: 15, height: 15, borderRadius: "50%", background: T.dustyRose, color: T.white, fontSize: 8, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {unreadCount}
+              </div>
+            )}
+          </div>
+          {t.id !== "prayers" && (
+            <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: active === t.id ? T.sageDark : T.inkLight, fontWeight: active === t.id ? 500 : 400 }}>{t.label}</span>
           )}
-          <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: active === t.id ? T.sageDark : T.inkLight, fontWeight: active === t.id ? 500 : 400 }}>{t.label}</span>
-          {active === t.id && <div style={{ width: 4, height: 4, borderRadius: "50%", background: T.sageDark }} />}
+          {t.id !== "prayers" && active === t.id && <div style={{ width: 4, height: 4, borderRadius: "50%", background: T.sageDark }} />}
         </button>
       ))}
     </div>
@@ -2456,6 +3186,7 @@ export default function App() {
   const [tab, setTab] = useState("prayers");
   const [prayers, setPrayers] = useState([]);
   const [friends, setFriends] = useState([]);
+  const [circles, setCircles] = useState([]);
   const [incomingRequests, setIncomingRequests] = useState([]);
   const [defaultPublic, setDefaultPublic] = useState(false);
   const [loadingPrayers, setLoadingPrayers] = useState(true);
@@ -2534,6 +3265,15 @@ export default function App() {
   }, [user]);
 
   useEffect(() => {
+    if (!user) { setCircles([]); return; }
+    const q = query(collection(db, "circles"), where("members", "array-contains", user.uid));
+    const unsub = onSnapshot(q, snap => {
+      setCircles(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return unsub;
+  }, [user]);
+
+  useEffect(() => {
     if (!user) { setFriends([]); return; }
 
     const loadFriendData = async (uids) => {
@@ -2596,7 +3336,7 @@ export default function App() {
   }, [user]);
 
   const addPrayer = async (fields) => {
-    await addDoc(collection(db, "prayers"), {
+    const prayerRef = await addDoc(collection(db, "prayers"), {
       userId: user.uid,
       title: fields.title || "",
       note: fields.note || "",
@@ -2612,8 +3352,17 @@ export default function App() {
       originalOwnerId: fields.originalOwnerId || null,
       originalPrayerId: fields.originalPrayerId || null,
       prayerDate: fields.prayerDate || null,
+      sharedToCircles: fields.sharedToCircles || [],
       createdAt: new Date().toISOString(),
     });
+    if (fields.sharedToCircles && fields.sharedToCircles.length > 0) {
+      for (const circleId of fields.sharedToCircles) {
+        await updateDoc(doc(db, "circles", circleId), {
+          prayerIds: arrayUnion(prayerRef.id),
+        });
+      }
+    }
+    return prayerRef;
   };
 
   const updatePrayer = async (id, fields) => {
@@ -2625,6 +3374,28 @@ export default function App() {
   };
 
   const sendFriendRequest = async (toUser) => {
+    // Check if a previous request exists (removed, declined) and reactivate it
+    const [snap1, snap2] = await Promise.all([
+      getDocs(query(collection(db, "friendRequests"), where("fromUid", "==", user.uid), where("toUid", "==", toUser.uid))),
+      getDocs(query(collection(db, "friendRequests"), where("fromUid", "==", toUser.uid), where("toUid", "==", user.uid))),
+    ]);
+    const existing = [...snap1.docs, ...snap2.docs];
+    if (existing.length > 0) {
+      // Reactivate the most recent one as pending
+      const latest = existing.sort((a, b) => new Date(b.data().createdAt) - new Date(a.data().createdAt))[0];
+      await updateDoc(doc(db, "friendRequests", latest.id), {
+        fromUid: user.uid,
+        fromName: user.displayName || "",
+        fromEmail: user.email || "",
+        fromPhoto: user.photoURL || "",
+        toUid: toUser.uid,
+        toEmail: toUser.email || "",
+        status: "pending",
+        createdAt: new Date().toISOString(),
+      });
+      return;
+    }
+    // No existing request — create a new one
     await addDoc(collection(db, "friendRequests"), {
       fromUid: user.uid,
       fromName: user.displayName || "",
@@ -2684,14 +3455,14 @@ export default function App() {
             <div style={{ textAlign: "center", padding: "60px 20px", fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight }}>Loading your prayers...</div>
           ) : (
             <>
-              {tab === "prayers" && <MyPrayers prayers={prayers} addPrayer={addPrayer} updatePrayer={updatePrayer} deletePrayer={deletePrayer} friends={friends} firstName={firstName} defaultPublic={defaultPublic} currentUser={user} />}
               {tab === "community" && <Community currentUser={user} friends={friends} myPrayers={prayers} addPrayer={addPrayer} incomingRequests={incomingRequests} onAccept={acceptRequest} onDecline={declineRequest} onSendRequest={sendFriendRequest} />}
-              {tab === "notifications" && <Notifications currentUser={user} />}
+              {tab === "circles" && <Circles currentUser={user} prayers={prayers} circles={circles} friends={friends} />}
+              {tab === "prayers" && <MyPrayers prayers={prayers} addPrayer={addPrayer} updatePrayer={updatePrayer} deletePrayer={deletePrayer} friends={friends} firstName={firstName} defaultPublic={defaultPublic} currentUser={user} circles={circles} />}
               {tab === "reflect" && <Reflect prayers={prayers} user={user} addPrayer={addPrayer} />}
-              {tab === "profile" && <Profile prayers={prayers} user={user} defaultPublic={defaultPublic} setDefaultPublic={setDefaultPublic} onSignOut={handleSignOut} />}
+              {tab === "profile" && <Profile prayers={prayers} user={user} defaultPublic={defaultPublic} setDefaultPublic={setDefaultPublic} onSignOut={handleSignOut} currentUser={user} unreadCount={unreadCount} />}
             </>
           )}
-          <BottomNav active={tab} setActive={setTab} requestCount={incomingRequests.length + unreadCount} />
+          <BottomNav active={tab} setActive={setTab} requestCount={incomingRequests.length + unreadCount} unreadCount={unreadCount} />
         </div>
       </ToastProvider>
     </>
