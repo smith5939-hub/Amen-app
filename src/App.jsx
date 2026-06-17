@@ -224,7 +224,7 @@ function PrayerCard({ prayer, onAnswer, onDelete, onEdit, mine = true, onAddToLi
   const isAnswered = prayer.status === "answered";
   const cats = Array.isArray(prayer.categories) ? prayer.categories : [prayer.categories].filter(Boolean);
   const accent = isAnswered ? T.sage : primaryCatColor(cats);
-  const showLock = mine && !prayer.fromFriend && !prayer.isPublic;
+  const showLock = mine && !prayer.fromFriend && !prayer.isPublic && !(prayer.sharedToCircles && prayer.sharedToCircles.length > 0);
   const handleCover = (e) => { e.stopPropagation(); onToggleCovered && onToggleCovered(prayer.id); };
 
   return (
@@ -576,8 +576,22 @@ function MyPrayers({ prayers, addPrayer, updatePrayer, deletePrayer, friends, fi
     setShowAdd(false);
     showToast("Prayer added");
   };
-  const handleSave = async ({ title, note, categories, isPublic, prayerDate }) => {
-    await updatePrayer(editTarget.id, { title, note, categories, isPublic, prayerDate });
+  const handleSave = async ({ title, note, categories, isPublic, prayerDate, sharedToCircles }) => {
+    const oldCircles = editTarget.sharedToCircles || [];
+    const newCircles = sharedToCircles || [];
+    // Remove from circles no longer selected
+    for (const circleId of oldCircles) {
+      if (!newCircles.includes(circleId)) {
+        await updateDoc(doc(db, "circles", circleId), { prayerIds: arrayRemove(editTarget.id) });
+      }
+    }
+    // Add to newly selected circles
+    for (const circleId of newCircles) {
+      if (!oldCircles.includes(circleId)) {
+        await updateDoc(doc(db, "circles", circleId), { prayerIds: arrayUnion(editTarget.id) });
+      }
+    }
+    await updatePrayer(editTarget.id, { title, note, categories, isPublic, prayerDate, sharedToCircles: newCircles });
     setEditTarget(null);
     showToast("Changes saved");
   };
@@ -2814,13 +2828,23 @@ function CircleDetail({ circle, circleId, currentUser, onBack, friends = [] }) {
   useEffect(() => {
     if (!circle.prayerIds || circle.prayerIds.length === 0) { setPrayers([]); return; }
     const fetchPrayers = async () => {
-      const chunks = [];
-      for (let i = 0; i < circle.prayerIds.length; i += 10) chunks.push(circle.prayerIds.slice(i, i + 10));
       const results = [];
-      for (const chunk of chunks) {
-        const q = query(collection(db, "prayers"), where("__name__", "in", chunk));
-        const snap = await getDocs(q);
-        snap.docs.forEach(d => results.push({ id: d.id, ...d.data() }));
+      const toRemove = [];
+      for (const prayerId of circle.prayerIds) {
+        try {
+          const snap = await getDoc(doc(db, "prayers", prayerId));
+          if (snap.exists()) results.push({ id: snap.id, ...snap.data() });
+          else toRemove.push(prayerId);
+        } catch (err) {
+          // Prayer not accessible — remove from circle to keep count accurate
+          toRemove.push(prayerId);
+        }
+      }
+      // Clean up inaccessible prayer IDs from circle
+      if (toRemove.length > 0 && circle.createdBy === currentUser.uid) {
+        for (const id of toRemove) {
+          await updateDoc(doc(db, "circles", circleId), { prayerIds: arrayRemove(id) });
+        }
       }
       results.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       setPrayers(results);
@@ -3356,11 +3380,19 @@ export default function App() {
       createdAt: new Date().toISOString(),
     });
     if (fields.sharedToCircles && fields.sharedToCircles.length > 0) {
+      const circleMemberUids = new Set();
       for (const circleId of fields.sharedToCircles) {
         await updateDoc(doc(db, "circles", circleId), {
           prayerIds: arrayUnion(prayerRef.id),
         });
+        // Fetch circle members so we can store them on the prayer for Firestore rules
+        const circleSnap = await getDoc(doc(db, "circles", circleId));
+        if (circleSnap.exists()) {
+          (circleSnap.data().members || []).forEach(uid => circleMemberUids.add(uid));
+        }
       }
+      // Store circle member UIDs on prayer so Firestore rules can check access
+      await updateDoc(prayerRef, { sharedWithUids: Array.from(circleMemberUids) });
     }
     return prayerRef;
   };
