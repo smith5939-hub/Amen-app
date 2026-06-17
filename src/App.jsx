@@ -2880,6 +2880,45 @@ function CircleDetail({ circle, circleId, currentUser, onBack, friends = [] }) {
     }
   };
 
+  const handleHoldForOthers = async (prayer) => {
+    try {
+      const existing = await getDocs(query(
+        collection(db, "prayers"),
+        where("userId", "==", currentUser.uid),
+        where("originalPrayerId", "==", prayer.id)
+      ));
+      const activeExists = existing.docs.some(d => d.data().status === "active");
+      if (activeExists) { showToast("Already holding this prayer"); return; }
+      const removedDoc = existing.docs.find(d => d.data().status === "removed");
+      if (removedDoc) {
+        await updateDoc(doc(db, "prayers", removedDoc.id), { status: "active" });
+      } else {
+        await addDoc(collection(db, "prayers"), {
+          userId: currentUser.uid,
+          title: prayer.title,
+          note: prayer.note || "",
+          categories: prayer.categories || [],
+          isPublic: false,
+          status: "active",
+          fromFriend: true,
+          ownerName: circle.memberDetails?.[prayer.userId]?.name || "Circle member",
+          sourceKey: `${prayer.userId}_${prayer.id}`,
+          originalOwnerId: prayer.userId,
+          originalPrayerId: prayer.id,
+          sharedToCircles: [],
+          sharedWithUids: [],
+          prayerDate: prayer.prayerDate || null,
+          createdAt: new Date().toISOString(),
+          date: new Date().toISOString().split("T")[0],
+          praying: 0,
+        });
+      }
+      showToast("Added to Holding for Others 🙏");
+    } catch (err) {
+      showToast("Could not add to your list");
+    }
+  };
+
   const members = Object.entries(circle.memberDetails || {});
   const categories = ["All", ...Array.from(new Set(prayers.flatMap(p => p.categories || []))),"Answered"];
   const filtered = prayers.filter(p => {
@@ -2979,10 +3018,15 @@ function CircleDetail({ circle, circleId, currentUser, onBack, friends = [] }) {
                   })}
                 </div>
               )}
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <button onClick={() => handlePray(p)} style={{ display: "flex", alignItems: "center", gap: 5, background: isPraying ? T.sageDark : T.sageLight, border: "none", borderRadius: 16, padding: "6px 12px", fontSize: 11, fontWeight: 500, color: isPraying ? T.white : T.sageDark, fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}>
                   🙏 {isPraying ? "Praying" : "I'm Praying"}
                 </button>
+                {p.userId !== currentUser.uid && (
+                  <button onClick={() => handleHoldForOthers(p)} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: `1px solid ${T.parchment}`, borderRadius: 16, padding: "6px 12px", fontSize: 11, fontWeight: 500, color: T.inkLight, fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}>
+                    + Add to my list
+                  </button>
+                )}
               </div>
             </div>
           );
