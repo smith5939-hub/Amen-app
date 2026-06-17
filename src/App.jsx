@@ -2873,6 +2873,8 @@ function CircleDetail({ circle, circleId, currentUser, onBack, friends = [] }) {
         prayingUserId: currentUser.uid,
         prayerOwnerId: prayer.userId,
         prayerId: prayer.id,
+        prayerTitle: prayer.title || "",
+        prayerName: currentUser.displayName || "A friend",
         prayedAt: new Date().toISOString(),
       });
       setPrayingIds(prev => [...prev, prayer.id]);
