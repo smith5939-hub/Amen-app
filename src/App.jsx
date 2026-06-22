@@ -1381,7 +1381,8 @@ function SignIn() {
     setLoading(true);
     setError(null);
     try {
-      if (isIOS()) {
+      if (isNative()) {
+        // Native iOS and Android both use SocialLogin
         await SocialLogin.initialize({
           google: {
             webClientId: "1051687728666-dg08ekiuui1rpo24nhqapfleqpo9t2g4.apps.googleusercontent.com",
@@ -1394,13 +1395,10 @@ function SignIn() {
         const credential = GoogleAuthProvider.credential(idToken);
         await signInWithCredential(auth, credential);
       } else {
+        // Web fallback
         const provider = new GoogleAuthProvider();
         provider.setCustomParameters({ prompt: "select_account" });
-        if (isAndroid()) {
-          await signInWithRedirect(auth, provider);
-        } else {
-          await signInWithPopup(auth, provider);
-        }
+        await signInWithPopup(auth, provider);
       }
     } catch (e) {
       console.error("Google sign in error:", e);
