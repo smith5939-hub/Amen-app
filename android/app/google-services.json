@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "1051687728666",
+    "project_id": "lift-app-13917",
+    "storage_bucket": "lift-app-13917.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1051687728666:android:eab4ba489f2080e60f03a3",
+        "android_client_info": {
+          "package_name": "com.liftprayer.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1051687728666-dg08ekiuui1rpo24nhqapfleqpo9t2g4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAjh7xZilOHbltEBflHMvJ0JbLxvQtS7SU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1051687728666-dg08ekiuui1rpo24nhqapfleqpo9t2g4.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1051687728666-qqp4ncsccjfpj71u4d3prkmhtqitpnf9.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.liftprayer.app"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
