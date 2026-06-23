@@ -1386,7 +1386,8 @@ function SignIn() {
         await SocialLogin.initialize({
           google: {
             webClientId: "1051687728666-dg08ekiuui1rpo24nhqapfleqpo9t2g4.apps.googleusercontent.com",
-            iOSClientId: "1051687728666-qqp4ncsccjfpj71u4d3prkmhtqitpnf9.apps.googleusercontent.com"
+            iOSClientId: "1051687728666-qqp4ncsccjfpj71u4d3prkmhtqitpnf9.apps.googleusercontent.com",
+            androidClientId: "1051687728666-dg08ekiuui1rpo24nhqapfleqpo9t2g4.apps.googleusercontent.com"
           }
         });
         const result = await SocialLogin.login({ provider: "google", options: { scopes: ["profile", "email"] } });
@@ -1476,10 +1477,10 @@ function SignIn() {
       <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: T.inkLight, textAlign: "center", maxWidth: 270, lineHeight: 1.6, marginBottom: 32 }}>A quiet place to bring your prayers, hold others up, and remember how God moves.</div>
       {error && <div style={{ color: T.dustyRose, fontFamily: "'DM Sans', sans-serif", fontSize: 13, marginBottom: 16 }}>{error}</div>}
       <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%", maxWidth: 280 }}>
-        <button onClick={handleApple} disabled={anyLoading} style={{ background: "#000", border: "none", borderRadius: 14, padding: "14px 32px", cursor: anyLoading ? "default" : "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 500, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, boxShadow: "0 1px 6px rgba(0,0,0,0.15)", opacity: anyLoading ? 0.6 : 1, width: "100%" }}>
+        {!isAndroid() && <button onClick={handleApple} disabled={anyLoading} style={{ background: "#000", border: "none", borderRadius: 14, padding: "14px 32px", cursor: anyLoading ? "default" : "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 500, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, boxShadow: "0 1px 6px rgba(0,0,0,0.15)", opacity: anyLoading ? 0.6 : 1, width: "100%" }}>
           <span style={{ fontSize: 20, lineHeight: 1, fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif", marginTop: -2 }}>&#xF8FF;</span>
           {appleLoading ? "Signing in..." : "Continue with Apple"}
-        </button>
+        </button>}
         <button onClick={handleGoogle} disabled={anyLoading} style={{ background: T.white, border: `1.5px solid ${T.parchment}`, borderRadius: 14, padding: "14px 32px", cursor: anyLoading ? "default" : "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 500, color: T.ink, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, boxShadow: "0 1px 6px rgba(0,0,0,0.07)", opacity: anyLoading ? 0.6 : 1, width: "100%" }}>
           <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.31z"/></svg>
           {loading ? "Signing in..." : "Continue with Google"}
