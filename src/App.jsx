@@ -2,6 +2,7 @@ import { useState, useEffect, createContext, useContext } from "react";
 import { auth, db, functions } from "./firebase";
 import { onAuthStateChanged, signInWithPopup, signInWithRedirect, GoogleAuthProvider, signOut, signInWithCredential, getRedirectResult } from "firebase/auth";
 import { SocialLogin } from "@capgo/capacitor-social-login";
+import { FirebaseMessaging } from "@capacitor-firebase/messaging";
 import {
   addDoc,
   arrayUnion,
@@ -24,6 +25,28 @@ import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSe
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
+
+async function registerNativePush(firebaseUser) {
+  if (!firebaseUser) return;
+  if (!(window.Capacitor?.isNativePlatform?.())) return; // native only; web push handled separately
+  try {
+    const perm = await FirebaseMessaging.requestPermissions();
+    if (perm.receive !== "granted") {
+      console.log("Native push permission not granted:", perm.receive);
+      return;
+    }
+    const { token } = await FirebaseMessaging.getToken();
+    if (!token) { console.log("No FCM token returned"); return; }
+    await setDoc(
+      doc(db, "users", firebaseUser.uid),
+      { fcmTokens: arrayUnion(token), fcmTokenUpdatedAt: new Date().toISOString() },
+      { merge: true }
+    );
+    console.log("FCM token registered for", firebaseUser.uid);
+  } catch (e) {
+    console.log("Native push registration error:", e);
+  }
+}
 
 async function syncLatestGoogleProfileToFirestore(firebaseUser) {
   if (!firebaseUser) return;
@@ -1387,7 +1410,7 @@ function SignIn() {
           google: {
             webClientId: "1051687728666-dg08ekiuui1rpo24nhqapfleqpo9t2g4.apps.googleusercontent.com",
             iOSClientId: "1051687728666-qqp4ncsccjfpj71u4d3prkmhtqitpnf9.apps.googleusercontent.com",
-            androidClientId: "1051687728666-dg08ekiuui1rpo24nhqapfleqpo9t2g4.apps.googleusercontent.com"
+            androidClientId: "1051687728666-t5f6922tukoop4gsenapcfup7a5a7vmn.apps.googleusercontent.com"
           }
         });
         const result = await SocialLogin.login({ provider: "google", options: { scopes: ["profile", "email"] } });
@@ -1419,7 +1442,7 @@ function SignIn() {
           provider: "apple",
           options: { scopes: ["email", "name"] }
         });
-        const idToken = result?.result?.identityToken;
+        const idToken = result?.result?.idToken;
         if (!idToken) throw new Error("No Apple identity token returned");
         const { OAuthProvider } = await import("firebase/auth");
         const provider = new OAuthProvider("apple.com");
@@ -1432,8 +1455,8 @@ function SignIn() {
           doc(db, "users", firebaseUser.uid),
           {
             uid: firebaseUser.uid,
-            displayName: appleProfile?.fullName?.givenName
-              ? `${appleProfile.fullName.givenName} ${appleProfile.fullName.familyName || ""}`.trim()
+            displayName: appleProfile?.profile?.givenName
+              ? `${appleProfile.profile.givenName} ${appleProfile.profile.familyName || ""}`.trim()
               : firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "Friend",
             email: firebaseUser.email || appleProfile?.email || "",
             photoURL: firebaseUser.photoURL || "",
@@ -3357,7 +3380,10 @@ export default function App() {
           createdAt: new Date().toISOString(),
         }, { merge: true });
 // Bucket 3 — Web Push subscription (skip in Capacitor native app)
-        try {
+        // Native push (iOS/Android) via FCM
+        await registerNativePush(firebaseUser);
+
+        if (!(window.Capacitor?.isNativePlatform?.())) try {
           if (!('serviceWorker' in navigator)) throw new Error('SW not supported');
           const swReg = await navigator.serviceWorker.ready;
           const permission = await Notification.requestPermission();

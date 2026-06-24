@@ -1,2 +1,18 @@
 node_modules
 .env
+
+# Signing keys - NEVER commit
+*.p8
+*.jks
+Mac/
+
+# Firebase config (client keys; excluded from public repo)
+GoogleService-Info.plist
+google-services.json
+
+# macOS junk
+.DS_Store
+**/.DS_Store
+
+# Backups
+*.bak

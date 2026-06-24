@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, initializeAuth, indexedDBLocalPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getMessaging } from "firebase/messaging";
 import { getFunctions } from "firebase/functions";
@@ -15,7 +15,17 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+const isIOSNative =
+  typeof window !== "undefined" &&
+  window.Capacitor &&
+  window.Capacitor.isNativePlatform &&
+  window.Capacitor.isNativePlatform() &&
+  window.Capacitor.getPlatform &&
+  window.Capacitor.getPlatform() === "ios";
+
+export const auth = isIOSNative
+  ? initializeAuth(app, { persistence: indexedDBLocalPersistence })
+  : getAuth(app);
 export const db = getFirestore(app);
 export const functions = getFunctions(app);
 

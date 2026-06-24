@@ -3,6 +3,7 @@ const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } = require("firebase-functions/v2/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
+const { getMessaging } = require("firebase-admin/messaging");
 const webpush = require("web-push");
 
 initializeApp();
@@ -50,6 +51,38 @@ async function sendPushToUser(userId, title, body, type = "general") {
       console.error("Push error:", e);
       if (e.statusCode === 410) await subDoc.ref.delete();
     }
+  }
+
+  // ── Native push (iOS/Android) via FCM ──
+  try {
+    const userSnap = await db.collection("users").doc(userId).get();
+    const tokens = userSnap.exists ? (userSnap.data().fcmTokens || []) : [];
+    if (tokens.length) {
+      const resp = await getMessaging().sendEachForMulticast({
+        tokens,
+        notification: { title, body },
+        data: { type: String(type) },
+      });
+      // Clean up any tokens FCM reports as invalid
+      const stale = [];
+      resp.responses.forEach((r, i) => {
+        if (!r.success) {
+          const code = r.error && r.error.code;
+          if (code === "messaging/registration-token-not-registered" ||
+              code === "messaging/invalid-registration-token") {
+            stale.push(tokens[i]);
+          }
+        }
+      });
+      if (stale.length) {
+        const { FieldValue } = require("firebase-admin/firestore");
+        await db.collection("users").doc(userId).update({
+          fcmTokens: FieldValue.arrayRemove(...stale),
+        });
+      }
+    }
+  } catch (e) {
+    console.error("FCM push error:", e);
   }
 }
 
