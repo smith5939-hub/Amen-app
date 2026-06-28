@@ -1,6 +1,6 @@
 import { useState, useEffect, createContext, useContext } from "react";
 import { auth, db, functions } from "./firebase";
-import { onAuthStateChanged, signInWithPopup, signInWithRedirect, GoogleAuthProvider, signOut, signInWithCredential, getRedirectResult, deleteUser, updateProfile, reauthenticateWithCredential, reauthenticateWithPopup } from "firebase/auth";
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, GoogleAuthProvider, signOut, signInWithCredential, getRedirectResult, deleteUser, reauthenticateWithCredential, reauthenticateWithPopup } from "firebase/auth";
 import { SocialLogin } from "@capgo/capacitor-social-login";
 import { FirebaseMessaging } from "@capacitor-firebase/messaging";
 import {
@@ -48,18 +48,6 @@ async function registerNativePush(firebaseUser) {
   }
 }
 
-// Returns a clean display name, avoiding Apple private-relay gibberish
-function safeDisplayName(rawName, email) {
-  const name = (rawName || "").trim();
-  if (name) return name;
-  const e = (email || "").toLowerCase();
-  if (!e || e.includes("privaterelay.appleid.com")) return "Friend";
-  const prefix = e.split("@")[0];
-  // Reject token-like prefixes (long random strings, all-hex hashes)
-  if (prefix.length > 20 || /^[0-9a-f]{16,}$/i.test(prefix)) return "Friend";
-  return prefix;
-}
-
 async function syncLatestGoogleProfileToFirestore(firebaseUser) {
   if (!firebaseUser) return;
 
@@ -74,7 +62,10 @@ async function syncLatestGoogleProfileToFirestore(firebaseUser) {
       doc(db, "users", firebaseUser.uid),
       {
         uid: firebaseUser.uid,
-        displayName: safeDisplayName(googleProfile?.displayName || firebaseUser.displayName, firebaseUser.email),
+        displayName:
+          googleProfile?.displayName ||
+          firebaseUser.displayName ||
+          fallbackName,
         email: firebaseUser.email || "",
         photoURL:
           googleProfile?.photoURL ||
@@ -101,7 +92,7 @@ async function syncGoogleProfileToFirestore(firebaseUser) {
       doc(db, "users", firebaseUser.uid),
       {
         uid: firebaseUser.uid,
-        displayName: safeDisplayName(firebaseUser.displayName, firebaseUser.email),
+        displayName: firebaseUser.displayName || fallbackName,
         email: firebaseUser.email || "",
         photoURL: firebaseUser.photoURL || "",
         updatedAt: serverTimestamp(),
@@ -1137,37 +1128,6 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut, cu
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [editingName, setEditingName] = useState(false);
-  const [nameDraft, setNameDraft] = useState("");
-  const [savedName, setSavedName] = useState(null);
-  const [savingName, setSavingName] = useState(false);
-  const displayedName = savedName || user?.displayName || "";
-
-  const startEditName = () => {
-    setNameDraft(displayedName && displayedName !== "My Account" ? displayedName : "");
-    setEditingName(true);
-  };
-
-  const saveName = async () => {
-    const newName = nameDraft.trim();
-    if (!newName) { setEditingName(false); return; }
-    setSavingName(true);
-    try {
-      const fbUser = auth.currentUser;
-      if (fbUser) {
-        await updateProfile(fbUser, { displayName: newName });
-        await setDoc(doc(db, "users", fbUser.uid), { displayName: newName }, { merge: true });
-      }
-      setSavedName(newName);
-      setEditingName(false);
-      showToast("Name updated");
-    } catch (err) {
-      console.error("Update name error:", err);
-      showToast("Couldn't update name — please try again");
-    } finally {
-      setSavingName(false);
-    }
-  };
 
   const reauthenticate = async (fbUser) => {
     const providerId = fbUser.providerData?.[0]?.providerId;
@@ -1423,28 +1383,9 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut, cu
         </div>
       )}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 28 }}>
-        <Avatar initials={(displayedName || "Me").split(" ").map(n => n[0]).join("").slice(0, 2)} photoURL={user?.photoURL} size={60} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {editingName ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <input
-                autoFocus
-                value={nameDraft}
-                onChange={(e) => setNameDraft(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") saveName(); if (e.key === "Escape") setEditingName(false); }}
-                maxLength={40}
-                placeholder="Your name"
-                style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 600, color: T.ink, border: "1px solid " + T.sageDark, borderRadius: 8, padding: "2px 8px", background: "#fff", outline: "none", width: "100%", maxWidth: 190 }}
-              />
-              <button onClick={saveName} disabled={savingName} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 18, color: T.sageDark, padding: 2, flexShrink: 0 }}>✓</button>
-              <button onClick={() => setEditingName(false)} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 16, color: T.inkLight, padding: 2, flexShrink: 0 }}>✕</button>
-            </div>
-          ) : (
-            <div onClick={startEditName} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 600, color: T.ink }}>{displayedName || "Tap to add your name"}</div>
-              <span style={{ fontSize: 13, color: T.inkLight }}>✎</span>
-            </div>
-          )}
+        <Avatar initials={(user?.displayName || "Me").split(" ").map(n => n[0]).join("").slice(0, 2)} photoURL={user?.photoURL} size={60} />
+        <div>
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 600, color: T.ink }}>{user?.displayName || "My Account"}</div>
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>{user?.email || ""}</div>
         </div>
       </div>
@@ -1657,7 +1598,7 @@ function SignIn() {
             uid: firebaseUser.uid,
             displayName: appleProfile?.profile?.givenName
               ? `${appleProfile.profile.givenName} ${appleProfile.profile.familyName || ""}`.trim()
-              : safeDisplayName(firebaseUser.displayName, firebaseUser.email),
+              : firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "Friend",
             email: firebaseUser.email || appleProfile?.email || "",
             photoURL: firebaseUser.photoURL || "",
             updatedAt: serverTimestamp(),
@@ -1676,7 +1617,7 @@ function SignIn() {
           doc(db, "users", firebaseUser.uid),
           {
             uid: firebaseUser.uid,
-            displayName: safeDisplayName(firebaseUser.displayName, firebaseUser.email),
+            displayName: firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "Friend",
             email: firebaseUser.email || "",
             photoURL: firebaseUser.photoURL || "",
             updatedAt: serverTimestamp(),

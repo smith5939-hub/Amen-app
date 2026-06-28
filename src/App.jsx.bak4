@@ -48,18 +48,6 @@ async function registerNativePush(firebaseUser) {
   }
 }
 
-// Returns a clean display name, avoiding Apple private-relay gibberish
-function safeDisplayName(rawName, email) {
-  const name = (rawName || "").trim();
-  if (name) return name;
-  const e = (email || "").toLowerCase();
-  if (!e || e.includes("privaterelay.appleid.com")) return "Friend";
-  const prefix = e.split("@")[0];
-  // Reject token-like prefixes (long random strings, all-hex hashes)
-  if (prefix.length > 20 || /^[0-9a-f]{16,}$/i.test(prefix)) return "Friend";
-  return prefix;
-}
-
 async function syncLatestGoogleProfileToFirestore(firebaseUser) {
   if (!firebaseUser) return;
 
@@ -74,7 +62,10 @@ async function syncLatestGoogleProfileToFirestore(firebaseUser) {
       doc(db, "users", firebaseUser.uid),
       {
         uid: firebaseUser.uid,
-        displayName: safeDisplayName(googleProfile?.displayName || firebaseUser.displayName, firebaseUser.email),
+        displayName:
+          googleProfile?.displayName ||
+          firebaseUser.displayName ||
+          fallbackName,
         email: firebaseUser.email || "",
         photoURL:
           googleProfile?.photoURL ||
@@ -101,7 +92,7 @@ async function syncGoogleProfileToFirestore(firebaseUser) {
       doc(db, "users", firebaseUser.uid),
       {
         uid: firebaseUser.uid,
-        displayName: safeDisplayName(firebaseUser.displayName, firebaseUser.email),
+        displayName: firebaseUser.displayName || fallbackName,
         email: firebaseUser.email || "",
         photoURL: firebaseUser.photoURL || "",
         updatedAt: serverTimestamp(),
@@ -1657,7 +1648,7 @@ function SignIn() {
             uid: firebaseUser.uid,
             displayName: appleProfile?.profile?.givenName
               ? `${appleProfile.profile.givenName} ${appleProfile.profile.familyName || ""}`.trim()
-              : safeDisplayName(firebaseUser.displayName, firebaseUser.email),
+              : firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "Friend",
             email: firebaseUser.email || appleProfile?.email || "",
             photoURL: firebaseUser.photoURL || "",
             updatedAt: serverTimestamp(),
@@ -1676,7 +1667,7 @@ function SignIn() {
           doc(db, "users", firebaseUser.uid),
           {
             uid: firebaseUser.uid,
-            displayName: safeDisplayName(firebaseUser.displayName, firebaseUser.email),
+            displayName: firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "Friend",
             email: firebaseUser.email || "",
             photoURL: firebaseUser.photoURL || "",
             updatedAt: serverTimestamp(),
