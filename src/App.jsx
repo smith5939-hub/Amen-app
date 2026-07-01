@@ -1018,7 +1018,7 @@ function Friends({ currentUser, friends, incomingRequests, onAccept, onDecline, 
                 </div>
                 {alreadyFriend
                   ? <Badge label="Friend" color={T.sage} />
-                  : <Btn small variant={requestSent ? "secondary" : "primary"} onClick={() => { onSendRequest(u); showToast("Friend request sent 🙏"); }} disabled={requestSent}>{requestSent ? "Sent ✓" : "Connect"}</Btn>
+                  : <Btn small variant={requestSent ? "secondary" : "primary"} onClick={() => { onSendRequest(u); showToast("Friend request sent 🙏"); setSearch(""); setSearchResult(null); setRequestSent(false); }} disabled={requestSent}>{requestSent ? "Sent ✓" : "Connect"}</Btn>
                 }
               </div>
             );
@@ -1122,7 +1122,7 @@ function TestimonyModal({ prayer, onClose }) {
   );
 }
 
-function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut, currentUser, unreadCount }) {
+function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut, currentUser, unreadCount, incomingRequests = [], onAcceptRequest, onDeclineRequest, friends = [], onSendRequest }) {
   const showToast = useToast();
   const [remindersOn, setRemindersOn] = useState(true);
   const [reminderTimes, setReminderTimes] = useState(["morning"]);
@@ -1134,6 +1134,15 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut, cu
   const [viewTestimony, setViewTestimony] = useState(null);
   const [showNotifs, setShowNotifs] = useState(false);
   const [notifs, setNotifs] = useState([]);
+  const [friendPrompt, setFriendPrompt] = useState(null);
+  const clearFriendReqNotif = async (req) => {
+    try {
+      const matches = notifs.filter(n => n.type === "friend_request" && (n.body || "").startsWith(req.fromName || "__no_name__"));
+      for (const m of matches) await updateDoc(doc(db, "notifications", m.id), { read: true, dismissed: true });
+    } catch (e) { /* non-fatal */ }
+  };
+  const handleAcceptRequest = async (req) => { await onAcceptRequest(req); await clearFriendReqNotif(req); };
+  const handleDeclineRequest = async (req) => { await onDeclineRequest(req); await clearFriendReqNotif(req); };
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -1364,9 +1373,9 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut, cu
             <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
           </svg>
-          {notifs.filter(n => !n.read).length > 0 && (
+          {(notifs.filter(n => !n.read).length + incomingRequests.length) > 0 && (
             <div style={{ position: "absolute", top: 4, right: 4, width: 16, height: 16, borderRadius: "50%", background: T.dustyRose, color: T.white, fontSize: 9, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {notifs.filter(n => !n.read).length}
+              {notifs.filter(n => !n.read).length + incomingRequests.length}
             </div>
           )}
         </button>
@@ -1375,13 +1384,26 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut, cu
       {showNotifs && (
         <div style={{ marginBottom: 24, background: T.parchment, borderRadius: 16, padding: "16px", border: `1px solid ${T.sage}` }}>
           <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: T.ink, marginBottom: 12 }}>Notifications</div>
-          {notifs.length === 0 && (
+          {incomingRequests.map(req => (
+            <div key={req.id} style={{ background: T.white, borderRadius: 12, padding: "12px 14px", marginBottom: 8, borderLeft: `4px solid ${T.sage}`, display: "flex", gap: 12, alignItems: "flex-start" }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 14, color: T.ink, marginBottom: 2 }}>👥 New friend request</div>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, lineHeight: 1.5 }}>{req.fromName || req.fromEmail || "Someone"} wants to pray with you on LIFT.</div>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, marginTop: 4 }}>{req.createdAt ? fmt(req.createdAt) : ""}</div>
+                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                  <button onClick={() => handleAcceptRequest(req)} style={{ border: "none", background: T.sageDark, color: T.white, borderRadius: 10, padding: "6px 16px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", fontWeight: 500 }}>Accept</button>
+                  <button onClick={() => handleDeclineRequest(req)} style={{ border: `1px solid ${T.parchment}`, background: "none", color: T.inkLight, borderRadius: 10, padding: "6px 16px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}>Decline</button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {notifs.length === 0 && incomingRequests.length === 0 && (
             <div style={{ textAlign: "center", padding: "20px 0" }}>
               <div style={{ fontSize: 28, marginBottom: 8 }}>🔔</div>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight }}>No notifications yet</div>
             </div>
           )}
-          {notifs.map(n => (
+          {notifs.filter(n => n.type !== "friend_request").map(n => (
             <div key={n.id} style={{ background: T.white, borderRadius: 12, padding: "12px 14px", marginBottom: 8, borderLeft: `4px solid ${n.read ? T.parchment : T.sage}`, display: "flex", gap: 12, alignItems: "flex-start" }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 14, color: T.ink, marginBottom: 2 }}>{n.title}</div>
@@ -1400,6 +1422,7 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut, cu
                       });
                       await updateDoc(doc(db, "notifications", n.id), { read: true, accepted: true, dismissed: false });
                       setNotifs(prev => prev.map(x => x.id === n.id ? { ...x, accepted: true } : x));
+                      if (n.fromUid && !friends.some(f => f.uid === n.fromUid)) setFriendPrompt({ uid: n.fromUid, name: n.fromName });
                     }} style={{ border: "none", background: T.sageDark, color: T.white, borderRadius: 10, padding: "6px 16px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", fontWeight: 500 }}>
                       Accept
                     </button>
@@ -1420,6 +1443,18 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut, cu
               )}
             </div>
           ))}
+        </div>
+      )}
+      {friendPrompt && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ background: T.cream, borderRadius: 16, padding: "24px 20px", width: "100%", maxWidth: 340 }}>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: T.ink, marginBottom: 8 }}>Add as a friend?</div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.inkLight, lineHeight: 1.5, marginBottom: 20 }}>You're now praying together in a circle. Send {friendPrompt.name || "them"} a friend request too?</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={async () => { const p = friendPrompt; setFriendPrompt(null); try { await onSendRequest({ uid: p.uid, displayName: p.name }); showToast("Friend request sent 🙏"); } catch (e) { showToast("Couldn't send request"); } }} style={{ flex: 1, border: "none", background: T.sageDark, color: T.white, borderRadius: 12, padding: "10px", fontSize: 14, fontWeight: 500, fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}>Yes, add friend</button>
+              <button onClick={() => setFriendPrompt(null)} style={{ flex: 1, border: `1px solid ${T.parchment}`, background: "none", color: T.inkLight, borderRadius: 12, padding: "10px", fontSize: 14, fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}>Not now</button>
+            </div>
+          </div>
         </div>
       )}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 28 }}>
@@ -2095,7 +2130,7 @@ function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequest
                       </div>
                       {alreadyFriend
                         ? <Badge label="Friend" color={T.sage} />
-                        : <Btn small variant="primary" onClick={() => { onSendRequest(u); showToast("Friend request sent 🙏"); }}>Connect</Btn>
+                        : <Btn small variant="primary" onClick={() => { onSendRequest(u); showToast("Friend request sent 🙏"); setSearch(""); setSearchResult(null); setRequestSent(false); }}>Connect</Btn>
                       }
                     </div>
                   );
@@ -3112,7 +3147,54 @@ Let's pray together!`);
   );
 }
 
-function CircleDetail({ circle, circleId, currentUser, onBack, friends = [] }) {
+function CircleMemberModal({ member, currentUser, friends = [], incomingRequests = [], onSendRequest, onAcceptRequest, onClose, showToast }) {
+  const [sent, setSent] = useState(false);
+  const [accepted, setAccepted] = useState(false);
+  const isYou = member.uid === currentUser.uid;
+  const isFriend = friends.some(f => f.uid === member.uid);
+  const pendingIncoming = incomingRequests.find(r => r.fromUid === member.uid);
+  const getInitials = (name) => (name || "?").split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
+
+  const handleAdd = async () => {
+    try { await onSendRequest({ uid: member.uid, displayName: member.name }); setSent(true); showToast("Friend request sent 🙏"); }
+    catch (e) { showToast("Couldn't send request"); }
+  };
+  const handleAccept = async () => {
+    try { await onAcceptRequest(pendingIncoming); setAccepted(true); showToast("You're now friends 🙏"); }
+    catch (e) { showToast("Couldn't accept request"); }
+  };
+
+  const primaryBtn = { width: "100%", border: "none", background: T.sageDark, color: T.white, borderRadius: 12, padding: "12px", fontSize: 14, fontWeight: 500, fontFamily: "'DM Sans', sans-serif", cursor: "pointer" };
+  const statusText = { fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.sageDark, fontWeight: 500, textAlign: "center", padding: "10px 0 4px" };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 2500, display: "flex", alignItems: "flex-end" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: T.cream, borderRadius: "20px 20px 0 0", padding: "24px 20px 36px", width: "100%", maxWidth: 480, margin: "0 auto" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
+          <div style={{ width: 52, height: 52, borderRadius: "50%", background: T.sageDark, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 500, color: "#fff", fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>{getInitials(member.name)}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, color: T.ink }}>{member.name || "Circle member"}</div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight }}>{isYou ? "This is you" : (isFriend || accepted) ? "Praying together as friends" : "Circle member"}</div>
+          </div>
+        </div>
+        {isYou ? (
+          <div style={{ ...statusText, color: T.inkLight, fontWeight: 400 }}>This is your profile.</div>
+        ) : (isFriend || accepted) ? (
+          <div style={statusText}>✓ Already friends</div>
+        ) : pendingIncoming ? (
+          <button onClick={handleAccept} style={primaryBtn}>Accept friend request</button>
+        ) : sent ? (
+          <div style={statusText}>✓ Request sent</div>
+        ) : (
+          <button onClick={handleAdd} style={primaryBtn}>+ Add friend</button>
+        )}
+        <button onClick={onClose} style={{ width: "100%", border: `1px solid ${T.parchment}`, background: "none", color: T.inkLight, borderRadius: 12, padding: "10px", fontSize: 14, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", marginTop: 10 }}>Close</button>
+      </div>
+    </div>
+  );
+}
+
+function CircleDetail({ circle, circleId, currentUser, onBack, friends = [], incomingRequests = [], onSendRequest, onAcceptRequest }) {
   const [prayers, setPrayers] = useState([]);
   const [filter, setFilter] = useState("All");
   const [prayingIds, setPrayingIds] = useState([]);
@@ -3215,6 +3297,8 @@ function CircleDetail({ circle, circleId, currentUser, onBack, friends = [] }) {
     }
   };
 
+  const [selectedMember, setSelectedMember] = useState(null);
+  const [showMembers, setShowMembers] = useState(false);
   const members = Object.entries(circle.memberDetails || {});
   const categories = ["All", ...Array.from(new Set(prayers.flatMap(p => p.categories || []))),"Answered"];
   const filtered = prayers.filter(p => {
@@ -3242,11 +3326,12 @@ function CircleDetail({ circle, circleId, currentUser, onBack, friends = [] }) {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6, paddingBottom: 12 }}>
           {members.slice(0, 5).map(([uid, m], i) => (
-            <div key={uid} title={m.name} style={{ width: 28, height: 28, borderRadius: "50%", background: AVATAR_COLORS[i % AVATAR_COLORS.length], display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 500, color: "#fff", border: `2px solid ${T.cream}`, marginLeft: i > 0 ? -8 : 0, fontFamily: "'DM Sans', sans-serif" }}>
+            <div key={uid} title={m.name} onClick={() => setSelectedMember({ uid, name: m.name, photoURL: m.photoURL })} style={{ width: 28, height: 28, borderRadius: "50%", background: AVATAR_COLORS[i % AVATAR_COLORS.length], display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 500, color: "#fff", border: `2px solid ${T.cream}`, marginLeft: i > 0 ? -8 : 0, fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}>
               {getInitials(m.name)}
             </div>
           ))}
           {members.length > 5 && <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, marginLeft: 4 }}>+{members.length - 5} more</div>}
+          <button onClick={() => setShowMembers(v => !v)} style={{ marginLeft: members.length > 5 ? 8 : 4, border: `1px solid ${T.sageDark}`, background: showMembers ? T.sageLight : "none", borderRadius: 14, padding: "4px 12px", fontSize: 11, color: T.sageDark, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", fontWeight: 500, flexShrink: 0 }}>{showMembers ? "Hide members ▲" : "View members ▼"}</button>
           <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
             <button onClick={() => { setShowInvite(true); }} style={{ border: `1px solid ${T.sageDark}`, background: "none", borderRadius: 14, padding: "4px 12px", fontSize: 11, color: T.sageDark, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", fontWeight: 500 }}>+ Invite</button>
             {circle.createdBy !== currentUser.uid && (
@@ -3267,6 +3352,30 @@ function CircleDetail({ circle, circleId, currentUser, onBack, friends = [] }) {
             )}
           </div>
         </div>
+        {showMembers && (
+          <div style={{ background: T.white, borderRadius: 12, border: `1px solid ${T.parchment}`, padding: "4px 12px", marginBottom: 10 }}>
+            {members.map(([uid, m], i) => {
+              const isYou = uid === currentUser.uid;
+              const isFriend = friends.some(f => f.uid === uid);
+              const pending = (incomingRequests || []).some(r => r.fromUid === uid);
+              return (
+                <div key={uid} onClick={() => setSelectedMember({ uid, name: m.name, photoURL: m.photoURL })} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: i < members.length - 1 ? `1px solid ${T.parchment}` : "none", cursor: "pointer" }}>
+                  <div style={{ width: 30, height: 30, borderRadius: "50%", background: AVATAR_COLORS[i % AVATAR_COLORS.length], display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 500, color: "#fff", fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>{getInitials(m.name)}</div>
+                  <div style={{ flex: 1, minWidth: 0, fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: T.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name || "Circle member"}</div>
+                  {isYou ? (
+                    <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight }}>You</span>
+                  ) : isFriend ? (
+                    <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.sageDark, fontWeight: 500 }}>✓ Friends</span>
+                  ) : pending ? (
+                    <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.sageDark, fontWeight: 500 }}>Respond</span>
+                  ) : (
+                    <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: "#fff", background: T.sageDark, borderRadius: 12, padding: "4px 11px", fontWeight: 500 }}>+ Add</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
         <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 10 }}>
           {categories.map(cat => (
             <button key={cat} onClick={() => setFilter(cat)} style={{ flexShrink: 0, border: `1px solid ${filter === cat ? T.sageDark : T.parchment}`, background: filter === cat ? T.sageDark : "transparent", borderRadius: 14, padding: "4px 12px", fontSize: 11, color: filter === cat ? T.white : T.inkLight, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", fontWeight: filter === cat ? 500 : 400 }}>{cat}</button>
@@ -3280,6 +3389,18 @@ function CircleDetail({ circle, circleId, currentUser, onBack, friends = [] }) {
           currentUser={currentUser}
           friends={friends}
           onClose={() => setShowInvite(false)}
+          showToast={showToast}
+        />
+      )}
+      {selectedMember && (
+        <CircleMemberModal
+          member={selectedMember}
+          currentUser={currentUser}
+          friends={friends}
+          incomingRequests={incomingRequests}
+          onSendRequest={onSendRequest}
+          onAcceptRequest={onAcceptRequest}
+          onClose={() => setSelectedMember(null)}
           showToast={showToast}
         />
       )}
@@ -3346,7 +3467,7 @@ function CircleDetail({ circle, circleId, currentUser, onBack, friends = [] }) {
   );
 }
 
-function Circles({ currentUser, prayers: myPrayers, circles = [], friends = [] }) {
+function Circles({ currentUser, prayers: myPrayers, circles = [], friends = [], incomingRequests = [], onSendRequest, onAcceptRequest }) {
   const [activeCircle, setActiveCircle] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
@@ -3362,7 +3483,7 @@ function Circles({ currentUser, prayers: myPrayers, circles = [], friends = [] }
   if (activeCircle) {
     const circle = circles.find(c => c.id === activeCircle);
     if (!circle) return null;
-    return <CircleDetail circle={circle} circleId={activeCircle} currentUser={currentUser} onBack={() => setActiveCircle(null)} friends={friends} />;
+    return <CircleDetail circle={circle} circleId={activeCircle} currentUser={currentUser} onBack={() => setActiveCircle(null)} friends={friends} incomingRequests={incomingRequests} onSendRequest={onSendRequest} onAcceptRequest={onAcceptRequest} />;
   }
 
   return (
@@ -3529,9 +3650,9 @@ function BottomNav({ active, setActive, requestCount, unreadCount }) {
         <button key={t.id} onClick={() => setActive(t.id)} style={{ flex: 1, border: "none", background: "none", cursor: "pointer", padding: "10px 4px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, position: "relative" }}>
           <div style={{ position: "relative" }}>
             <NavIcon type={t.icon} active={active === t.id} />
-            {t.id === "profile" && unreadCount > 0 && (
+            {t.id === "profile" && requestCount > 0 && (
               <div style={{ position: "absolute", top: -2, right: -4, width: 15, height: 15, borderRadius: "50%", background: T.dustyRose, color: T.white, fontSize: 8, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {unreadCount}
+                {requestCount}
               </div>
             )}
           </div>
@@ -3831,10 +3952,10 @@ export default function App() {
           ) : (
             <>
               {tab === "community" && <Community currentUser={user} friends={friends} myPrayers={prayers} addPrayer={addPrayer} incomingRequests={incomingRequests} onAccept={acceptRequest} onDecline={declineRequest} onSendRequest={sendFriendRequest} />}
-              {tab === "circles" && <Circles currentUser={user} prayers={prayers} circles={circles} friends={friends} />}
+              {tab === "circles" && <Circles currentUser={user} prayers={prayers} circles={circles} friends={friends} incomingRequests={incomingRequests} onSendRequest={sendFriendRequest} onAcceptRequest={acceptRequest} />}
               {tab === "prayers" && <MyPrayers prayers={prayers} addPrayer={addPrayer} updatePrayer={updatePrayer} deletePrayer={deletePrayer} friends={friends} firstName={firstName} defaultPublic={defaultPublic} currentUser={user} circles={circles} />}
               {tab === "reflect" && <Reflect prayers={prayers} user={user} addPrayer={addPrayer} />}
-              {tab === "profile" && <Profile prayers={prayers} user={user} defaultPublic={defaultPublic} setDefaultPublic={setDefaultPublic} onSignOut={handleSignOut} currentUser={user} unreadCount={unreadCount} />}
+              {tab === "profile" && <Profile prayers={prayers} user={user} defaultPublic={defaultPublic} setDefaultPublic={setDefaultPublic} onSignOut={handleSignOut} currentUser={user} unreadCount={unreadCount} incomingRequests={incomingRequests} onAcceptRequest={acceptRequest} onDeclineRequest={declineRequest} friends={friends} onSendRequest={sendFriendRequest} />}
             </>
           )}
           <BottomNav active={tab} setActive={setTab} requestCount={incomingRequests.length + unreadCount} unreadCount={unreadCount} />
