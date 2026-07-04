@@ -1996,8 +1996,6 @@ function Community({ currentUser, friends, myPrayers, addPrayer, incomingRequest
     if (note) {
       await addDoc(collection(db, "notifications"), {
         toUid: prayer.userId,
-        fromUid: currentUser.uid,
-        fromName: currentUser.displayName || "A friend",
         title: "💬 Encouragement from " + (currentUser.displayName || "a friend"),
         body: note,
         type: "encouragement",
