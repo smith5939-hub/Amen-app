@@ -1373,9 +1373,9 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut, cu
             <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
           </svg>
-          {notifs.filter(n => !n.read).length > 0 && (
+          {(notifs.filter(n => !n.read).length + incomingRequests.length) > 0 && (
             <div style={{ position: "absolute", top: 4, right: 4, width: 16, height: 16, borderRadius: "50%", background: T.dustyRose, color: T.white, fontSize: 9, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {notifs.filter(n => !n.read).length}
+              {notifs.filter(n => !n.read).length + incomingRequests.length}
             </div>
           )}
         </button>
@@ -1420,7 +1420,9 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut, cu
                           joinedAt: new Date().toISOString(),
                         }
                       });
+                      await updateDoc(doc(db, "users", currentUser.uid), { circleIds: arrayUnion(n.circleId) });
                       await updateDoc(doc(db, "notifications", n.id), { read: true, accepted: true, dismissed: false });
+                      await updateDoc(doc(db, "users", currentUser.uid), { circleIds: arrayUnion(n.circleId) });
                       setNotifs(prev => prev.map(x => x.id === n.id ? { ...x, accepted: true } : x));
                       if (n.fromUid && !friends.some(f => f.uid === n.fromUid)) setFriendPrompt({ uid: n.fromUid, name: n.fromName });
                     }} style={{ border: "none", background: T.sageDark, color: T.white, borderRadius: 10, padding: "6px 16px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", fontWeight: 500 }}>
@@ -2967,6 +2969,8 @@ function CreateCircleModal({ onClose, onCreated, currentUser }) {
         inviteCode: code,
         prayerIds: [],
       });
+      await updateDoc(doc(db, "users", currentUser.uid), { circleIds: arrayUnion(ref.id) });
+      await updateDoc(doc(db, "users", currentUser.uid), { circleIds: arrayUnion(ref.id) });
       setLoading(false);
       onCreated(ref.id);
       onClose();
@@ -3021,7 +3025,9 @@ function JoinCircleModal({ onClose, onJoined, currentUser }) {
         joinedAt: new Date().toISOString(),
       }
     });
+    await updateDoc(doc(db, "users", currentUser.uid), { circleIds: arrayUnion(circleDoc.id) });
     setLoading(false);
+    await updateDoc(doc(db, "users", currentUser.uid), { circleIds: arrayUnion(circleDoc.id) });
     onJoined(circleDoc.id);
     onClose();
   };
@@ -3099,7 +3105,7 @@ Let's pray together!`);
         <div style={{ display: "flex", gap: 0, marginBottom: 20, background: T.parchment, borderRadius: 12, padding: 4 }}>
           {["friends", "email"].map(t => (
             <button key={t} onClick={() => setTab(t)} style={{ flex: 1, border: "none", background: tab === t ? T.white : "transparent", borderRadius: 9, padding: "8px 0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", color: tab === t ? T.ink : T.inkLight, fontWeight: tab === t ? 500 : 400, cursor: "pointer" }}>
-              {t === "friends" ? "👥 From friends" : "✉️ Email invite"}
+              {t === "friends" ? "👥 From friends" : "Invite via Code or Email"}
             </button>
           ))}
         </div>
@@ -3212,8 +3218,8 @@ function CircleDetail({ circle, circleId, currentUser, onBack, friends = [], inc
           if (snap.exists()) results.push({ id: snap.id, ...snap.data() });
           else toRemove.push(prayerId);
         } catch (err) {
-          // Prayer not accessible — remove from circle to keep count accurate
-          toRemove.push(prayerId);
+          // Read failed (permissions/network) — NOT proof of deletion; skip, don't remove
+          console.warn("Could not read circle prayer", prayerId, err);
         }
       }
       // Clean up inaccessible prayer IDs from circle
@@ -3337,9 +3343,11 @@ function CircleDetail({ circle, circleId, currentUser, onBack, friends = [], inc
             {circle.createdBy !== currentUser.uid && (
               <button onClick={async () => {
                 if (!window.confirm("Leave this circle? You'll no longer see shared prayers.")) return;
+                await updateDoc(doc(db, "users", currentUser.uid), { circleIds: arrayRemove(circleId) });
                 await updateDoc(doc(db, "circles", circleId), {
                   members: arrayRemove(currentUser.uid),
                 });
+                await updateDoc(doc(db, "users", currentUser.uid), { circleIds: arrayRemove(circleId) });
                 onBack();
               }} style={{ border: `1px solid #c0392b`, background: "none", borderRadius: 14, padding: "4px 12px", fontSize: 11, color: "#c0392b", fontFamily: "'DM Sans', sans-serif", cursor: "pointer", fontWeight: 500 }}>Leave</button>
             )}
@@ -3650,9 +3658,9 @@ function BottomNav({ active, setActive, requestCount, unreadCount }) {
         <button key={t.id} onClick={() => setActive(t.id)} style={{ flex: 1, border: "none", background: "none", cursor: "pointer", padding: "10px 4px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, position: "relative" }}>
           <div style={{ position: "relative" }}>
             <NavIcon type={t.icon} active={active === t.id} />
-            {t.id === "profile" && unreadCount > 0 && (
+            {t.id === "profile" && requestCount > 0 && (
               <div style={{ position: "absolute", top: -2, right: -4, width: 15, height: 15, borderRadius: "50%", background: T.dustyRose, color: T.white, fontSize: 8, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {unreadCount}
+                {requestCount}
               </div>
             )}
           </div>
