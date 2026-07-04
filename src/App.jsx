@@ -1420,7 +1420,9 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut, cu
                           joinedAt: new Date().toISOString(),
                         }
                       });
+                      await updateDoc(doc(db, "users", currentUser.uid), { circleIds: arrayUnion(n.circleId) });
                       await updateDoc(doc(db, "notifications", n.id), { read: true, accepted: true, dismissed: false });
+                      await updateDoc(doc(db, "users", currentUser.uid), { circleIds: arrayUnion(n.circleId) });
                       setNotifs(prev => prev.map(x => x.id === n.id ? { ...x, accepted: true } : x));
                       if (n.fromUid && !friends.some(f => f.uid === n.fromUid)) setFriendPrompt({ uid: n.fromUid, name: n.fromName });
                     }} style={{ border: "none", background: T.sageDark, color: T.white, borderRadius: 10, padding: "6px 16px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", fontWeight: 500 }}>
@@ -2967,6 +2969,8 @@ function CreateCircleModal({ onClose, onCreated, currentUser }) {
         inviteCode: code,
         prayerIds: [],
       });
+      await updateDoc(doc(db, "users", currentUser.uid), { circleIds: arrayUnion(ref.id) });
+      await updateDoc(doc(db, "users", currentUser.uid), { circleIds: arrayUnion(ref.id) });
       setLoading(false);
       onCreated(ref.id);
       onClose();
@@ -3021,7 +3025,9 @@ function JoinCircleModal({ onClose, onJoined, currentUser }) {
         joinedAt: new Date().toISOString(),
       }
     });
+    await updateDoc(doc(db, "users", currentUser.uid), { circleIds: arrayUnion(circleDoc.id) });
     setLoading(false);
+    await updateDoc(doc(db, "users", currentUser.uid), { circleIds: arrayUnion(circleDoc.id) });
     onJoined(circleDoc.id);
     onClose();
   };
@@ -3099,7 +3105,7 @@ Let's pray together!`);
         <div style={{ display: "flex", gap: 0, marginBottom: 20, background: T.parchment, borderRadius: 12, padding: 4 }}>
           {["friends", "email"].map(t => (
             <button key={t} onClick={() => setTab(t)} style={{ flex: 1, border: "none", background: tab === t ? T.white : "transparent", borderRadius: 9, padding: "8px 0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", color: tab === t ? T.ink : T.inkLight, fontWeight: tab === t ? 500 : 400, cursor: "pointer" }}>
-              {t === "friends" ? "👥 From friends" : "✉️ Email invite"}
+              {t === "friends" ? "👥 From friends" : "Invite via Code or Email"}
             </button>
           ))}
         </div>
@@ -3212,8 +3218,8 @@ function CircleDetail({ circle, circleId, currentUser, onBack, friends = [], inc
           if (snap.exists()) results.push({ id: snap.id, ...snap.data() });
           else toRemove.push(prayerId);
         } catch (err) {
-          // Prayer not accessible — remove from circle to keep count accurate
-          toRemove.push(prayerId);
+          // Read failed (permissions/network) — NOT proof of deletion; skip, don't remove
+          console.warn("Could not read circle prayer", prayerId, err);
         }
       }
       // Clean up inaccessible prayer IDs from circle
@@ -3337,9 +3343,11 @@ function CircleDetail({ circle, circleId, currentUser, onBack, friends = [], inc
             {circle.createdBy !== currentUser.uid && (
               <button onClick={async () => {
                 if (!window.confirm("Leave this circle? You'll no longer see shared prayers.")) return;
+                await updateDoc(doc(db, "users", currentUser.uid), { circleIds: arrayRemove(circleId) });
                 await updateDoc(doc(db, "circles", circleId), {
                   members: arrayRemove(currentUser.uid),
                 });
+                await updateDoc(doc(db, "users", currentUser.uid), { circleIds: arrayRemove(circleId) });
                 onBack();
               }} style={{ border: `1px solid #c0392b`, background: "none", borderRadius: 14, padding: "4px 12px", fontSize: 11, color: "#c0392b", fontFamily: "'DM Sans', sans-serif", cursor: "pointer", fontWeight: 500 }}>Leave</button>
             )}
