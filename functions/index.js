@@ -1,8 +1,9 @@
+const nodemailer = require("nodemailer");
 const { setGlobalOptions } = require("firebase-functions");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } = require("firebase-functions/v2/firestore");
 const { initializeApp } = require("firebase-admin/app");
-const { getFirestore } = require("firebase-admin/firestore");
+const { getFirestore, Timestamp } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
 const webpush = require("web-push");
 
@@ -259,3 +260,67 @@ exports.claudeProxy = onCall(
     });
   }
 );
+
+// ---- Daily digest email (added by add_daily_digest.py) ----
+const gmailAppPassword = defineSecret("GMAIL_APP_PASSWORD");
+const DIGEST_TO = "smith.5939@gmail.com";
+const DIGEST_FROM = "smith.5939@gmail.com";
+
+exports.dailyDigest = onSchedule(
+  {
+    schedule: "every day 07:00",
+    timeZone: "America/New_York",
+    secrets: [gmailAppPassword],
+  },
+  async () => {
+    const db = getFirestore();
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const today = new Date().toISOString().slice(0, 10);
+
+    const [newPrayers, answeredAll, prayedActions, totalUsers, activeToday] =
+      await Promise.all([
+        db.collection("prayers").where("createdAt", ">=", since).get(),
+        db.collection("prayers").where("status", "==", "answered").get(),
+        db.collection("prayingRecords").where("createdAt", ">=", since).get(),
+        db.collection("users").count().get(),
+        db.collection("dailyActivity").where("date", "==", today).get(),
+      ]);
+
+    const row = (label, value) =>
+      `<tr>
+        <td style="padding:8px 0;border-bottom:1px solid #A8B89A;">${label}</td>
+        <td style="padding:8px 0;border-bottom:1px solid #A8B89A;
+            text-align:right;font-weight:bold;color:#6B8F71;">${value}</td>
+      </tr>`;
+
+    const html = `
+      <div style="font-family:Georgia,serif;max-width:520px;margin:0 auto;
+                  background:#F0EDE8;padding:24px;border-radius:12px;color:#1A1918;">
+        <h2 style="color:#6B8F71;margin-top:0;">🕊️ LIFT Daily Digest</h2>
+        <p style="color:#2C2C2A;">${new Date().toLocaleDateString("en-US",
+          { weekday: "long", month: "long", day: "numeric" })}</p>
+        <table style="width:100%;border-collapse:collapse;">
+          ${row("Total users", totalUsers.data().count)}
+          ${row("Active users today", activeToday.size)}
+          ${row("Prayers added (24h)", newPrayers.size)}
+          ${row("Answered prayers (all time)", answeredAll.size)}
+          ${row("'I'm Praying' taps (24h)", prayedActions.size)}
+        </table>
+      </div>`;
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: { user: DIGEST_FROM, pass: gmailAppPassword.value() },
+    });
+
+    await transporter.sendMail({
+      from: `"LIFT Digest" <${DIGEST_FROM}>`,
+      to: DIGEST_TO,
+      subject: `LIFT Daily: ${newPrayers.size} new prayers, ${prayedActions.size} prayer taps`,
+      html,
+    });
+
+    console.log("Daily digest sent.");
+  }
+);
+// ---- end daily digest ----
