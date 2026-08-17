@@ -228,8 +228,8 @@ function Avatar({ initials, photoURL, size = 36 }) {
   return <div style={{ width: size, height: size, borderRadius: "50%", background: T.sageLight, display: "flex", alignItems: "center", justifyContent: "center", color: T.sageDark, fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: size * 0.38, flexShrink: 0 }}>{initials}</div>;
 }
 
-function Card({ children, style = {} }) {
-  return <div style={{ background: T.white, borderRadius: 16, padding: "16px 18px", marginBottom: 12, boxShadow: "0 1px 6px rgba(0,0,0,0.05)", ...style }}>{children}</div>;
+function Card({ children, style = {}, ...rest }) {
+  return <div {...rest} style={{ background: T.white, borderRadius: 16, padding: "16px 18px", marginBottom: 12, boxShadow: "0 1px 6px rgba(0,0,0,0.05)", ...style }}>{children}</div>;
 }
 
 function Badge({ label, color = T.sage }) {
@@ -1145,6 +1145,9 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut, cu
   const handleDeclineRequest = async (req) => { await onDeclineRequest(req); await clearFriendReqNotif(req); };
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [statDetail, setStatDetail] = useState(null);
+  const [prayedByDetails, setPrayedByDetails] = useState([]);
+  const [prayedForDetails, setPrayedForDetails] = useState([]);
   const [deleting, setDeleting] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
@@ -1326,10 +1329,53 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut, cu
       }
       // Prayers prayed for others
       const prayedForSnap = await getDocs(query(collection(db, "prayingRecords"), where("prayingUserId", "==", user.uid)));
-      const uniquePrayedFor = new Set(prayedForSnap.docs.map(d => d.data().prayerOwnerId)).size;
+      const uniquePrayedFor = new Set(prayedForSnap.docs.map(d => d.data()).filter(r => r.prayingUserId !== r.prayerOwnerId).map(r => r.prayerOwnerId)).size;
       // People who prayed for me
       const prayedBySnap = await getDocs(query(collection(db, "prayingRecords"), where("prayerOwnerId", "==", user.uid)));
-      const uniquePrayedBy = new Set(prayedBySnap.docs.map(d => d.data().prayingUserId)).size;
+      const uniquePrayedBy = new Set(prayedBySnap.docs.map(d => d.data()).filter(r => r.prayingUserId !== r.prayerOwnerId).map(r => r.prayingUserId)).size;
+      // --- Detail rows for tappable tiles ---
+      // "People Prayed For": prayerName IS the owner (who you prayed for) — free.
+      const forRecords = prayedForSnap.docs
+        .map(d => d.data())
+        .filter(r => r.prayingUserId !== r.prayerOwnerId);
+      const byRecords = prayedBySnap.docs
+        .map(d => d.data())
+        .filter(r => r.prayingUserId !== r.prayerOwnerId);
+      // prayerName on the record is unreliable (can be the pray-er, not the
+      // owner), so resolve the real displayName for BOTH sides from user docs:
+      // owners for "People Prayed For", pray-ers for "Prayed For You".
+      const uidSet = [...new Set([
+        ...forRecords.map(r => r.prayerOwnerId),
+        ...byRecords.map(r => r.prayingUserId),
+      ])];
+      const profileMap = {};
+      await Promise.all(uidSet.map(async (uid) => {
+        try {
+          const uSnap = await getDoc(doc(db, "users", uid));
+          if (uSnap.exists()) {
+            const u = uSnap.data();
+            profileMap[uid] = { name: u.displayName || "Someone", photo: u.photoURL || null };
+          }
+        } catch (e) { /* leave unresolved; falls back to "Someone" */ }
+      }));
+      const prayedForRows = forRecords
+        .map(r => ({
+          uid: r.prayerOwnerId,
+          name: (profileMap[r.prayerOwnerId] && profileMap[r.prayerOwnerId].name) || "Someone",
+          title: r.prayerTitle || "a prayer",
+          at: r.prayedAt,
+        }))
+        .sort((a, b) => new Date(b.at) - new Date(a.at));
+      setPrayedForDetails(prayedForRows);
+      const prayedByRows = byRecords
+        .map(r => ({
+          uid: r.prayingUserId,
+          name: (profileMap[r.prayingUserId] && profileMap[r.prayingUserId].name) || "Someone",
+          title: r.prayerTitle || "your prayer",
+          at: r.prayedAt,
+        }))
+        .sort((a, b) => new Date(b.at) - new Date(a.at));
+      setPrayedByDetails(prayedByRows);
       // Encouragement sent
       const encourageSent = prayedForSnap.docs.filter(d => d.data().note).length;
       // Encouragement received
@@ -1545,17 +1591,21 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut, cu
           { label: "Days Prayed", val: stats.daysPrayed },
           { label: "Current Streak", val: stats.streak },
           { label: "Prayers Added", val: stats.totalPrayers },
-          { label: "People Prayed For", val: stats.prayedFor },
-          { label: "Prayed For You", val: stats.prayedByOthers },
+          { label: "People Prayed For", val: stats.prayedFor, detail: "prayedFor" },
+          { label: "Prayed For You", val: stats.prayedByOthers, detail: "prayedBy" },
           { label: "Encouragements Sent", val: stats.encourageSent },
           { label: "Encouragements Received", val: stats.encourageReceived },
           { label: "Journal Entries", val: stats.journalEntries },
-        ].map(({ label, val }) => (
-          <Card key={label} style={{ padding: "14px 14px", marginBottom: 0 }}>
+        ].map(({ label, val, detail }) => {
+          const tappable = detail && val > 0;
+          return (
+          <Card key={label} onClick={tappable ? () => setStatDetail(detail) : undefined} style={{ padding: "14px 14px", marginBottom: 0, cursor: tappable ? "pointer" : "default", position: "relative" }}>
+            {tappable && <div style={{ position: "absolute", top: 12, right: 12, color: T.sage, fontSize: 15, lineHeight: 1 }}>›</div>}
             <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 28, fontWeight: 600, color: T.sageDark }}>{val}</div>
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, marginTop: 2 }}>{label}</div>
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       <button onClick={() => setShowTestimonies(!showTestimonies)} style={{ width: "100%", border: "none", background: T.answeredBg, borderRadius: 14, padding: "14px 18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
@@ -1590,6 +1640,48 @@ function Profile({ prayers, user, defaultPublic, setDefaultPublic, onSignOut, cu
       </button>
       <Btn variant="ghost" style={{ width: "100%", justifyContent: "center", marginTop: 8, color: T.dustyRose }} onClick={onSignOut}>Sign Out</Btn>
       {viewTestimony && <TestimonyModal prayer={viewTestimony} onClose={() => setViewTestimony(null)} />}
+      {statDetail && (() => {
+        const isBy = statDetail === "prayedBy";
+        const rows = isBy ? prayedByDetails : prayedForDetails;
+        const people = new Set(rows.map(r => r.uid)).size;
+        const heading = isBy ? "Prayers lifted for you" : "People you've prayed for";
+        const relDate = (iso) => {
+          const then = new Date(iso), now = new Date();
+          const days = Math.floor((now - then) / 86400000);
+          if (isNaN(days)) return "";
+          if (days <= 0) return "Today";
+          if (days === 1) return "Yesterday";
+          if (days < 7) return days + " days ago";
+          if (days < 14) return "Last week";
+          if (days < 60) return Math.floor(days / 7) + " weeks ago";
+          return then.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+        };
+        return (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(26,25,24,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, zIndex: 1000 }} onClick={() => setStatDetail(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: T.cream, borderRadius: 20, padding: "24px", maxWidth: 380, width: "100%", maxHeight: "70vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 24, fontWeight: 600, color: T.ink }}>{heading}</div>
+              <button onClick={() => setStatDetail(null)} style={{ border: "none", background: "none", cursor: "pointer", color: T.inkLight, fontSize: 18, padding: 4 }}>✕</button>
+            </div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, marginBottom: 16 }}>{people} {people === 1 ? "person" : "people"} · {rows.length} {rows.length === 1 ? "prayer" : "prayers"}</div>
+            <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+              {rows.length === 0 && (
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: T.inkLight, textAlign: "center", padding: "24px 0" }}>Nothing here yet.</div>
+              )}
+              {rows.map((r, i) => (
+                <Card key={i} style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 0, padding: "14px 16px" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 14, color: T.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{isBy ? r.name : ("You prayed for " + r.name)}</div>
+                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: T.inkLight, marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.title}</div>
+                  </div>
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: T.inkLight, flexShrink: 0, whiteSpace: "nowrap", paddingTop: 1 }}>{relDate(r.at)}</div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+        );
+      })()}
       {showPrivacyModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(26,25,24,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, zIndex: 1000 }} onClick={() => setShowPrivacyModal(false)}>
           <div onClick={e => e.stopPropagation()} style={{ background: T.cream, borderRadius: 20, padding: "24px", maxWidth: 380, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
